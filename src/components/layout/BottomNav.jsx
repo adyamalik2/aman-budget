@@ -10,7 +10,7 @@ const BottomNav = ({tab, setTab, setAddOpen, setEditTx}) => {
     {id:"more", icon:LayoutGrid, label:"Lainnya"},
   ];
   return (
-    <div style={{position:"fixed", bottom:0, left:"50%", transform:"translateX(-50%)", width:"100%", maxWidth:430, background:"#fff", borderTop:`1px solid ${C.borderL}`, display:"flex", alignItems:"center", padding:"6px 4px 10px", zIndex:50, boxSizing:"border-box", boxShadow:"0 -4px 20px rgba(0,0,0,0.04)"}}>
+    <div style={{position:"fixed", bottom:0, left:"50%", transform:"translateX(-50%)", width:"100%", maxWidth:430, background:"#fff", borderTop:`1px solid ${C.borderL}`, display:"flex", alignItems:"center", padding:"6px 4px calc(10px + env(safe-area-inset-bottom))", zIndex:50, boxSizing:"border-box", boxShadow:"0 -4px 20px rgba(0,0,0,0.04)"}}>
       {items.map(n=>(
         n.fab ? (
           <button key={n.id} onClick={()=>{setEditTx(null); setAddOpen(true);}} style={{flex:1, display:"flex", justifyContent:"center", background:"none", border:"none", padding:0, cursor:"pointer"}}>
