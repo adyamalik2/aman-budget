@@ -17,12 +17,26 @@ import { C } from "../constants/theme";
 import { fmt, fmtS } from "../utils/format";
 import { formatPeriodLabel, normalizePeriod } from "../utils/period";
 import { calcGroups, calcSummary } from "../utils/summary";
+import { getGoalDisplayedSaved } from "../utils/goals";
 
 const card = {background:"#fff", borderRadius:16, padding:"14px 16px", border:`1px solid ${C.borderL}`, boxShadow:"0 1px 4px rgba(0,0,0,0.03)"};
 
-const HomeScreen = ({txs, period, setPeriod, years, onCopyBudget, setTab, setSubPage, setEditTx, setAddOpen, openUpgrade, user}) => {
+const HomeScreen = ({txs, allTxs = [], goals = [], period, setPeriod, years, onCopyBudget, setTab, setSubPage, setEditTx, setAddOpen, openUpgrade, user}) => {
   const s = calcSummary(txs);
   const grps = calcGroups(txs);
+
+  // Goal summary — pakai semua transaksi (allTxs) dan manual saved, konsisten dengan GoalsScreen
+  const goalsWithSaved = goals.map(g => ({...g, _saved: getGoalDisplayedSaved(g, allTxs)}));
+  const totalGoalSaved  = goalsWithSaved.reduce((sum, g) => sum + g._saved, 0);
+  const totalGoalTarget = goalsWithSaved.reduce((sum, g) => sum + Number(g.target||0), 0);
+  const goalPct = totalGoalTarget > 0 ? Math.min(Math.round(totalGoalSaved/totalGoalTarget*100), 100) : 0;
+  const topGoal = goalsWithSaved.length > 0
+    ? goalsWithSaved.reduce((best, g) => {
+        const pG = Number(g.target||0) > 0 ? g._saved/Number(g.target) : 0;
+        const pB = Number(best.target||0) > 0 ? best._saved/Number(best.target) : 0;
+        return pG > pB ? g : best;
+      })
+    : null;
   const unpaidItems = txs.filter(x=>x.status==="belum_selesai").slice(0, 3);
   const recent = [...txs].sort((a,b)=>b.date.localeCompare(a.date)).slice(0, 4);
   const periodMode = normalizePeriod(period).mode;
@@ -90,6 +104,43 @@ const HomeScreen = ({txs, period, setPeriod, years, onCopyBudget, setTab, setSub
             </button>
           ))}
         </div>
+
+        {/* Goals summary card */}
+        {goals.length > 0 && (
+          <div style={card}>
+            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8}}>
+              <p style={{fontSize:13, fontWeight:700, color:C.text, margin:0}}>Progress Goals</p>
+              <button onClick={()=>{setTab("goals-tab"); setSubPage(null);}}
+                style={{background:"none", border:"none", color:C.pri, fontSize:11, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", gap:2}}>
+                Lihat Goals <ChevronRight size={12}/>
+              </button>
+            </div>
+            <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-end", marginBottom:6}}>
+              <div>
+                <p style={{fontSize:11, color:C.textM, margin:0, fontWeight:600}}>TOTAL TERKUMPUL</p>
+                <p style={{fontSize:18, fontWeight:800, color:C.priD, margin:"2px 0 0"}}>{fmtS(totalGoalSaved)}</p>
+              </div>
+              <p style={{fontSize:22, fontWeight:800, color:C.pri, margin:0}}>{goalPct}%</p>
+            </div>
+            <div style={{background:C.borderL, borderRadius:8, height:8, overflow:"hidden", marginBottom:6}}>
+              <div style={{background:`linear-gradient(90deg, ${C.pri}, ${C.priD})`, height:"100%", width:`${goalPct}%`, borderRadius:8, transition:"width .5s"}}/>
+            </div>
+            <p style={{fontSize:11, color:C.textM, margin:"0 0 0"}}>
+              dari target {fmtS(totalGoalTarget)} · {goals.length} goal
+            </p>
+            {topGoal && (
+              <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", paddingTop:8, marginTop:8, borderTop:`1px solid ${C.borderL}`}}>
+                <div style={{display:"flex", alignItems:"center", gap:6}}>
+                  <div style={{width:8, height:8, borderRadius:"50%", background:topGoal.color||C.pri, flexShrink:0}}/>
+                  <span style={{fontSize:11, color:C.textM}}>Tertinggi: <b style={{color:C.text}}>{topGoal.name}</b></span>
+                </div>
+                <span style={{fontSize:11, fontWeight:800, color:topGoal.color||C.pri}}>
+                  {Number(topGoal.target||0)>0 ? Math.min(Math.round(topGoal._saved/Number(topGoal.target)*100),100) : 0}%
+                </span>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Progress card */}
         <div style={{...card, background:`linear-gradient(135deg, #fff 0%, ${C.priBg} 100%)`}}>

@@ -26,7 +26,7 @@ const PLANS = [
   {id:"yearly",  label:"Tahunan", price:149000, period:"/tahun", popular:true},
 ];
 
-const UpgradeScreen = ({setSubPage}) => {
+const UpgradeScreen = ({setSubPage, isPro = false, onActivatePro, onDeactivatePro}) => {
   const [plan, setPlan] = useState("yearly");
 
   return (
@@ -44,6 +44,11 @@ const UpgradeScreen = ({setSubPage}) => {
           </div>
           <p style={{fontSize:24, fontWeight:800, margin:0, letterSpacing:-0.5}}>AMAN Budget Pro</p>
           <p style={{fontSize:13, opacity:0.9, margin:"6px 0 0"}}>Kelola budget keluarga lebih leluasa</p>
+          {isPro && (
+            <span style={{display:"inline-block", marginTop:10, background:C.gold, color:"#fff", fontSize:11, fontWeight:800, padding:"4px 12px", borderRadius:20, letterSpacing:0.4}}>
+              PRO aktif
+            </span>
+          )}
         </div>
       </div>
 
@@ -131,6 +136,30 @@ const UpgradeScreen = ({setSubPage}) => {
         <p style={{textAlign:"center", fontSize:10, color:C.textL, margin:0, lineHeight:1.6}}>
           Pembayaran dikelola Google Play · Bisa dibatalkan kapan saja
         </p>
+
+        {/* Dev/Admin unlock — hapus saat rilis resmi Google Play */}
+        <div style={{borderTop:`1px solid ${C.borderL}`, paddingTop:14, display:"flex", flexDirection:"column", gap:8}}>
+          <p style={{fontSize:10, fontWeight:700, color:C.textL, margin:0, textAlign:"center", letterSpacing:0.5}}>
+            MODE DEVELOPMENT
+          </p>
+          {isPro ? (
+            <>
+              <div style={{background:C.priL, borderRadius:10, padding:"8px 12px", display:"flex", alignItems:"center", justifyContent:"center", gap:6}}>
+                <Crown size={14} color={C.priD}/>
+                <span style={{fontSize:12, fontWeight:800, color:C.priD}}>Pro aktif (Dev Mode)</span>
+              </div>
+              <button onClick={onDeactivatePro}
+                style={{background:C.borderL, border:`1px solid ${C.border}`, borderRadius:12, padding:"12px", color:C.textM, fontSize:13, fontWeight:700, cursor:"pointer"}}>
+                Matikan Pro Sementara
+              </button>
+            </>
+          ) : (
+            <button onClick={onActivatePro}
+              style={{background:C.goldL, border:`1px solid ${C.gold}66`, borderRadius:12, padding:"12px", color:C.goldD, fontSize:13, fontWeight:700, cursor:"pointer"}}>
+              Aktifkan Pro Sementara
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

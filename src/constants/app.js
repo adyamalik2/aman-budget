@@ -25,4 +25,5 @@ export const STORAGE_KEYS = {
   goals: "amanBudget.goals",
   user: "amanBudget.user",
   period: "amanBudget.period",
+  isPro: "aman_budget_is_pro",
 };

@@ -14,7 +14,7 @@ const ICON_MAP = {plane:Plane, grad:GraduationCap, shield:Shield};
 const EMPTY_GFORM = {name:"", target:""};
 const FREE_GOAL_LIMIT = 3;
 
-const GoalsScreen = ({goals, txs = [], openUpgrade, onAddSaving, onAddGoal, onEditGoal, onDeleteGoal}) => {
+const GoalsScreen = ({goals, txs = [], isPro = false, openUpgrade, onAddSaving, onAddGoal, onEditGoal, onDeleteGoal}) => {
   // Tambah Tabungan modal state
   const [savingGoal, setSavingGoal] = useState(null);
   const [amount, setAmount] = useState("");
@@ -158,7 +158,7 @@ const GoalsScreen = ({goals, txs = [], openUpgrade, onAddSaving, onAddGoal, onEd
 
         {/* Tambah Goal button — terkunci jika sudah di limit Free */}
         {(() => {
-          const atLimit = goals.length >= FREE_GOAL_LIMIT;
+          const atLimit = !isPro && goals.length >= FREE_GOAL_LIMIT;
           return (
             <div style={{display:"flex", flexDirection:"column", gap:4}}>
               <button type="button" onClick={atLimit ? openUpgrade : openAddGoal}
