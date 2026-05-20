@@ -7,8 +7,8 @@ import { fmt } from "../../utils/format";
 const inp = {width:"100%", border:`1.5px solid ${C.border}`, borderRadius:12, padding:"11px 14px", fontSize:14, outline:"none", boxSizing:"border-box", background:"#fff", color:C.text};
 const lbl = {fontSize:12, fontWeight:600, color:C.textM, display:"block", marginBottom:6};
 
-const AddSheet = ({editTx, onSave, onClose}) => {
-  const [f, setF] = useState(editTx || {date:new Date().toISOString().slice(0,10), type:"expense", grp:"bunda", cat:"", desc:"", amt:"", status:"estimasi", pay:"transfer", acc:"BSI"});
+const AddSheet = ({editTx, goals = [], onSave, onClose}) => {
+  const [f, setF] = useState(editTx || {date:new Date().toISOString().slice(0,10), type:"expense", grp:"bunda", cat:"", desc:"", amt:"", status:"estimasi", pay:"transfer", acc:"BSI", goalId:null});
   const [err, setErr] = useState({});
   const s = (k,v) => setF(p=>({...p, [k]:v}));
   const statusOptions = Object.entries(STATUS).filter(([v])=>f.type==="income" ? ["estimasi","selesai","batal"].includes(v) : true);
@@ -18,7 +18,7 @@ const AddSheet = ({editTx, onSave, onClose}) => {
     if(!f.desc?.trim()) e.desc = "Wajib diisi";
     if(!f.amt || Number(f.amt)<=0) e.amt = "Nominal harus > 0";
     if(Object.keys(e).length) {setErr(e); return;}
-    onSave({...f, amt:Number(f.amt), id:f.id||Date.now().toString()});
+    onSave({...f, amt:Number(f.amt), id:f.id||Date.now().toString(), goalId:f.goalId||null});
     onClose();
   };
 
@@ -87,6 +87,18 @@ const AddSheet = ({editTx, onSave, onClose}) => {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div>
+            <label style={lbl}>Hubungkan ke Goal</label>
+            <select style={inp} value={f.goalId || ""} onChange={e=>s("goalId", e.target.value || null)}>
+              <option value="" style={{color:C.text, background:"#fff"}}>Tidak terkait goal</option>
+              {goals.map(g=>(
+                <option key={g.id || g.name} value={g.id || g.name} style={{color:C.text, background:"#fff"}}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:10}}>

@@ -157,7 +157,7 @@ export default function App() {
       <div style={{width:"100%", maxWidth:430, display:"flex", flexDirection:"column", minHeight:"100vh", position:"relative", background:C.bg}}>
         {renderScreen()}
         {!hideNav && <BottomNav tab={tab} setTab={(t)=>{setTab(t); setSubPage(null);}} setAddOpen={setAddOpen} setEditTx={setEditTx}/>}
-        {addOpen && <AddSheet editTx={editTx} onSave={onSave} onClose={()=>{setAddOpen(false); setEditTx(null);}}/>}
+        {addOpen && <AddSheet editTx={editTx} goals={goals} onSave={onSave} onClose={()=>{setAddOpen(false); setEditTx(null);}}/>}
       </div>
     </div>
   );
