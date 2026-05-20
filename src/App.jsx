@@ -1,11 +1,11 @@
 import { useState, useMemo } from "react";
 import {
   Home, BarChart3, Target, Plus, Search, X, Edit2, Trash2,
-  Wallet, Bell, Crown, Sparkles, CheckCircle2, Clock,
+  Bell, Crown, Sparkles, CheckCircle2, Clock,
   Users, ArrowRightLeft, Plane, GraduationCap, Shield,
   ChevronRight, ChevronLeft, Mail, Lock, Send, Calculator, LayoutGrid,
   Star, Zap, LogOut, CreditCard, Receipt, PiggyBank, Check,
-  TrendingUp, TrendingDown, Filter, MoreVertical, FileDown, Copy, Share2
+  TrendingUp, TrendingDown, Filter, FileDown, Copy
 } from "lucide-react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 
@@ -111,7 +111,7 @@ const Btn = ({onClick, children, primary, style={}, disabled}) => (
 
 const Pill = ({active, onClick, children, color=C.pri}) => (
   <button onClick={onClick} style={{
-    padding:"7px 14px", borderRadius:20, border:"none", cursor:"pointer",
+    padding:"7px 14px", borderRadius:20, cursor:"pointer",
     fontSize:12, fontWeight:600, whiteSpace:"nowrap",
     background: active ? color : "#fff", color: active ? "#fff" : C.textM,
     border: `1px solid ${active ? color : C.border}`
@@ -199,7 +199,7 @@ const Header = ({title, subtitle, onBack, right, dark=true}) => (
 );
 
 // ─── HOME ───
-const HomeScreen = ({txs, setSubPage, setEditTx, setAddOpen, openUpgrade, user}) => {
+const HomeScreen = ({txs, setTab, setSubPage, setEditTx, setAddOpen, openUpgrade, user}) => {
   const s = calcSummary(txs);
   const grps = calcGroups(txs);
   const unpaidItems = txs.filter(x=>x.status==="belum_selesai").slice(0, 3);
@@ -255,7 +255,7 @@ const HomeScreen = ({txs, setSubPage, setEditTx, setAddOpen, openUpgrade, user})
           {[
             {icon:ArrowRightLeft, label:"Transfer", color:C.blue, action:()=>setSubPage("transfer")},
             {icon:Calculator, label:"Zakat", color:C.pri, action:()=>setSubPage("zakat")},
-            {icon:PiggyBank, label:"Goals", color:C.gold, action:()=>setSubPage("goals-tab")},
+            {icon:PiggyBank, label:"Goals", color:C.gold, action:()=>{setTab("goals-tab"); setSubPage(null);}},
             {icon:FileDown, label:"Export", color:"#8b5cf6", action:openUpgrade},
           ].map((q,i)=>(
             <button key={i} onClick={q.action} style={{background:"#fff", border:`1px solid ${C.borderL}`, borderRadius:14, padding:"10px 4px", cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", gap:4}}>
@@ -672,7 +672,7 @@ const ZakatScreen = ({setSubPage}) => {
 // ─── TX LIST ───
 const TxListScreen = ({txs, setSubPage, setEditTx, setAddOpen, onDelete, onDone}) => {
   const [fS, setFS] = useState("all");
-  const [fG, setFG] = useState("all");
+  const [fG] = useState("all");
   const [q, setQ] = useState("");
 
   const filtered = useMemo(()=>txs.filter(tx=>{
@@ -1088,14 +1088,16 @@ const ShareScreen = ({txs, setSubPage}) => {
       await navigator.clipboard.writeText(waText);
       setCopied(true);
       setTimeout(()=>setCopied(false), 2000);
-    } catch(e) {
+    } catch {
       const ta = document.createElement("textarea");
       ta.value = waText;
       ta.style.position = "fixed";
       ta.style.opacity = "0";
       document.body.appendChild(ta);
       ta.select();
-      try { document.execCommand("copy"); } catch(_) {}
+      try { document.execCommand("copy"); } catch {
+        // Keep the same fallback flow even if legacy copy is unavailable.
+      }
       document.body.removeChild(ta);
       setCopied(true);
       setTimeout(()=>setCopied(false), 2000);
@@ -1359,7 +1361,8 @@ export default function App() {
     if(subPage==="transfer") return <TransferScreen txs={txs} setSubPage={setSubPage}/>;
     if(subPage==="zakat") return <ZakatScreen setSubPage={setSubPage}/>;
     if(subPage==="tx-list") return <TxListScreen txs={txs} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} onDelete={onDelete} onDone={onDone}/>;
-    if(tab==="home") return <HomeScreen txs={txs} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} openUpgrade={openUpgrade} user={user}/>;
+    if(subPage==="share") return <ShareScreen txs={txs} setSubPage={setSubPage}/>;
+    if(tab==="home") return <HomeScreen txs={txs} setTab={setTab} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} openUpgrade={openUpgrade} user={user}/>;
     if(tab==="reports") return <ReportsScreen txs={txs} openUpgrade={openUpgrade}/>;
     if(tab==="goals-tab") return <GoalsScreen goals={goals} openUpgrade={openUpgrade}/>;
     if(tab==="more") return <MoreScreen setSubPage={setSubPage} openUpgrade={openUpgrade} onLogout={()=>setUser(null)}/>;
