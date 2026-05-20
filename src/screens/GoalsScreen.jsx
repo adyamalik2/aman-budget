@@ -3,7 +3,7 @@ import { ChevronRight, Crown, GraduationCap, Plane, Plus, Shield } from "lucide-
 import Header from "../components/layout/Header";
 import { C } from "../constants/theme";
 import { fmt, fmtS } from "../utils/format";
-import { getGoalDisplayedSaved } from "../utils/goals";
+import { calcGoalTransactionSaved, getGoalDisplayedSaved } from "../utils/goals";
 
 const card = {background:"#fff", borderRadius:16, padding:"14px 16px", border:`1px solid ${C.borderL}`, boxShadow:"0 1px 4px rgba(0,0,0,0.03)"};
 const inp = {width:"100%", border:`1.5px solid ${C.border}`, borderRadius:12, padding:"12px 14px", fontSize:16, outline:"none", boxSizing:"border-box", background:"#fff", color:C.text, fontWeight:700};
@@ -54,7 +54,9 @@ const GoalsScreen = ({goals, txs = [], openUpgrade, onAddSaving}) => {
 
         {/* Goals list */}
         {goals.map(g=>{
-          const displayedSaved = getGoalDisplayedSaved(g, txs);
+          const manualSaved = Number(g.saved || 0);
+          const txSaved = calcGoalTransactionSaved(txs, g);
+          const displayedSaved = manualSaved + txSaved;
           const pct = Math.round(displayedSaved/g.target*100);
           const Icon = iconMap[g.icon];
           return (
@@ -73,9 +75,15 @@ const GoalsScreen = ({goals, txs = [], openUpgrade, onAddSaving}) => {
                 <div style={{background:C.borderL, borderRadius:8, height:8, overflow:"hidden", marginBottom:8}}>
                   <div style={{background:g.color, height:"100%", width:`${pct}%`, transition:"width .5s"}}/>
                 </div>
-                <div style={{display:"flex", justifyContent:"space-between", fontSize:11}}>
-                  <span style={{color:C.textM}}>Terkumpul: <b style={{color:C.text}}>{fmtS(displayedSaved)}</b></span>
-                  <span style={{color:C.textM}}>Sisa: <b style={{color:C.text}}>{fmtS(g.target-displayedSaved)}</b></span>
+                <div style={{display:"flex", flexDirection:"column", gap:3}}>
+                  <div style={{display:"flex", justifyContent:"space-between", fontSize:11}}>
+                    <span style={{color:C.textM}}>Manual: <b style={{color:C.text}}>{fmtS(manualSaved)}</b></span>
+                    <span style={{color:C.textM}}>Dari transaksi: <b style={{color:C.text}}>{fmtS(txSaved)}</b></span>
+                  </div>
+                  <div style={{display:"flex", justifyContent:"space-between", fontSize:11}}>
+                    <span style={{color:C.textM}}>Total terkumpul: <b style={{color:g.color}}>{fmtS(displayedSaved)}</b></span>
+                    <span style={{color:C.textM}}>Sisa: <b style={{color:C.text}}>{fmtS(g.target-displayedSaved)}</b></span>
+                  </div>
                 </div>
               </div>
               <button type="button" onClick={()=>openSavingModal(g)} aria-label={`Tambah tabungan ${g.name}`} style={{width:"100%", padding:"10px", background:g.color+"10", border:"none", color:g.color, fontSize:12, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:5}}>
