@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import {
-  Home, BarChart3, Target, Plus, Search, X, Trash2,
+  Plus, Search, X, Trash2,
   Bell, Crown, Sparkles, CheckCircle2, Clock,
   Users, ArrowRightLeft, Plane, GraduationCap, Shield,
   ChevronRight, ChevronLeft, Mail, Lock, Send, Calculator, LayoutGrid,
@@ -8,8 +8,14 @@ import {
   TrendingUp, TrendingDown, Filter, FileDown, Copy, Upload
 } from "lucide-react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
+import Btn from "./components/ui/Button";
+import Pill from "./components/ui/Pill";
+import Badge from "./components/ui/Badge";
+import Header from "./components/layout/Header";
+import BottomNav from "./components/layout/BottomNav";
+import PeriodPicker from "./components/period/PeriodPicker";
 import { C } from "./constants/theme";
-import { GROUPS, MONTHS, STATUS, STORAGE_KEYS } from "./constants/app";
+import { GROUPS, STATUS, STORAGE_KEYS } from "./constants/app";
 import { INIT_GOALS, INIT_TX } from "./data/initialData";
 import { fmt, fmtS } from "./utils/format";
 import { loadStored, removeStored, saveStored } from "./utils/storage";
@@ -32,121 +38,6 @@ import { calcCashflowChartData, calcGroups, calcSummary } from "./utils/summary"
 const card = {background:"#fff", borderRadius:16, padding:"14px 16px", border:`1px solid ${C.borderL}`, boxShadow:"0 1px 4px rgba(0,0,0,0.03)"};
 const inp = {width:"100%", border:`1.5px solid ${C.border}`, borderRadius:12, padding:"11px 14px", fontSize:14, outline:"none", boxSizing:"border-box", background:"#fff", color:C.text};
 const lbl = {fontSize:12, fontWeight:600, color:C.textM, display:"block", marginBottom:6};
-
-const Btn = ({onClick, children, primary, style={}, disabled}) => (
-  <button onClick={onClick} disabled={disabled} style={{
-    width:"100%", padding:"13px", borderRadius:12, border:"none", cursor:disabled?"not-allowed":"pointer",
-    fontSize:14, fontWeight:700, opacity:disabled?0.5:1,
-    background: primary ? C.pri : "#fff", color: primary ? "#fff" : C.pri,
-    boxShadow: primary ? "0 4px 14px rgba(22,163,74,0.25)" : `inset 0 0 0 1.5px ${C.pri}`,
-    ...style
-  }}>{children}</button>
-);
-
-const Pill = ({active, onClick, children, color=C.pri}) => (
-  <button onClick={onClick} style={{
-    padding:"7px 14px", borderRadius:20, cursor:"pointer",
-    fontSize:12, fontWeight:600, whiteSpace:"nowrap",
-    background: active ? color : "#fff", color: active ? "#fff" : C.textM,
-    border: `1px solid ${active ? color : C.border}`
-  }}>{children}</button>
-);
-
-const Badge = ({children, bg, color}) => (
-  <span style={{background:bg, color, fontSize:10, padding:"3px 8px", borderRadius:6, fontWeight:700, letterSpacing:0.3}}>
-    {children}
-  </span>
-);
-
-const PeriodPicker = ({period, setPeriod, years, onCopyBudget, dark=false, style={}}) => {
-  const p = normalizePeriod(period);
-  const labelColor = dark ? "rgba(255,255,255,0.8)" : C.textM;
-  const selectStyle = {
-    border: dark ? "1px solid rgba(255,255,255,0.35)" : `1px solid ${C.border}`,
-    background: dark ? "rgba(255,255,255,0.16)" : "#fff",
-    color: dark ? "#fff" : C.text,
-    borderRadius:10,
-    padding:"8px 10px",
-    fontSize:12,
-    fontWeight:700,
-    outline:"none",
-    colorScheme:"light",
-    width:"100%",
-    minWidth:0,
-    boxSizing:"border-box",
-  };
-  const optionStyle = {color:C.text, background:"#fff"};
-  const periodSelectorStyle = {display:"flex", flexDirection:"column", gap:8, width:"100%", ...style};
-  const periodHeaderStyle = {display:"flex", alignItems:"center", gap:8, flexWrap:"wrap"};
-  const periodLabelStyle = {fontSize:11, fontWeight:700, color:labelColor, minWidth:60};
-  const singleRowStyle = {display:"grid", gridTemplateColumns:"minmax(0, 1fr) 110px", gap:8, width:"100%"};
-  const rangeWrapStyle = {display:"flex", flexDirection:"column", gap:6, width:"100%"};
-  const rangeRowStyle = {display:"grid", gridTemplateColumns:"60px minmax(0, 1fr) 110px", gap:8, alignItems:"center", width:"100%"};
-  const set = changes => setPeriod(prev=>normalizePeriod({...prev, ...changes}));
-  const modeBtn = active => ({
-    border:"none",
-    borderRadius:9,
-    padding:"8px 10px",
-    fontSize:12,
-    fontWeight:800,
-    cursor:"pointer",
-    background: active ? (dark ? "#fff" : C.pri) : (dark ? "rgba(255,255,255,0.14)" : C.borderL),
-    color: active ? (dark ? C.priD : "#fff") : (dark ? "rgba(255,255,255,0.82)" : C.textM),
-  });
-  const copyBtnStyle = {
-    border:dark?"1px solid rgba(255,255,255,0.35)":`1px solid ${C.pri}`,
-    background:dark?"rgba(255,255,255,0.16)":"#fff",
-    color:dark?"#fff":C.pri,
-    borderRadius:10,
-    padding:"8px 10px",
-    fontSize:12,
-    fontWeight:800,
-    cursor:"pointer",
-  };
-  const monthSelect = (value, onChange, label) => (
-    <select aria-label={label} style={selectStyle} value={value} onChange={onChange}>
-      {MONTHS.map((m,i)=><option key={m} value={i+1} style={optionStyle}>{m}</option>)}
-    </select>
-  );
-  const yearSelect = (value, onChange, label) => (
-    <select aria-label={label} style={selectStyle} value={value} onChange={onChange}>
-      {years.map(y=><option key={y} value={y} style={optionStyle}>{y}</option>)}
-    </select>
-  );
-  return (
-    <div style={periodSelectorStyle}>
-      <div style={periodHeaderStyle}>
-        <span style={{...periodLabelStyle, minWidth:"auto"}}>Periode</span>
-        <div style={{display:"flex", gap:4, background:dark?"rgba(255,255,255,0.12)":C.borderL, borderRadius:11, padding:2}}>
-          <button type="button" onClick={()=>set({mode:"month"})} style={modeBtn(p.mode==="month")}>Bulanan</button>
-          <button type="button" onClick={()=>set({mode:"range"})} style={modeBtn(p.mode==="range")}>Range</button>
-        </div>
-        {p.mode==="month" && onCopyBudget && (
-          <button type="button" onClick={onCopyBudget} style={copyBtnStyle}>Copy Bulan Lalu</button>
-        )}
-      </div>
-      {p.mode === "range" ? (
-        <div style={rangeWrapStyle}>
-          <div style={rangeRowStyle}>
-            <span style={periodLabelStyle}>Dari</span>
-            {monthSelect(p.startMonth, e=>set({startMonth:Number(e.target.value)}), "Bulan mulai")}
-            {yearSelect(p.startYear, e=>set({startYear:Number(e.target.value)}), "Tahun mulai")}
-          </div>
-          <div style={rangeRowStyle}>
-            <span style={periodLabelStyle}>Sampai</span>
-            {monthSelect(p.endMonth, e=>set({endMonth:Number(e.target.value)}), "Bulan selesai")}
-            {yearSelect(p.endYear, e=>set({endYear:Number(e.target.value)}), "Tahun selesai")}
-          </div>
-        </div>
-      ) : (
-        <div style={singleRowStyle}>
-          {monthSelect(p.month, e=>set({month:Number(e.target.value)}), "Bulan")}
-          {yearSelect(p.year, e=>set({year:Number(e.target.value)}), "Tahun")}
-        </div>
-      )}
-    </div>
-  );
-};
 
 // ─── LOGIN ───
 const LoginScreen = ({onLogin}) => {
@@ -203,24 +94,6 @@ const LoginScreen = ({onLogin}) => {
     </div>
   );
 };
-
-// ─── HEADER ───
-const Header = ({title, subtitle, onBack, right, dark=true}) => (
-  <div style={{background: dark?C.pri:"#fff", padding:"42px 16px 16px", color: dark?"#fff":C.text, borderBottom: dark?"none":`1px solid ${C.borderL}`}}>
-    <div style={{display:"flex", alignItems:"center", gap:12}}>
-      {onBack && (
-        <button onClick={onBack} style={{background:"none", border:"none", padding:0, cursor:"pointer", color:"inherit", display:"flex"}}>
-          <ChevronLeft size={26}/>
-        </button>
-      )}
-      <div style={{flex:1}}>
-        <p style={{fontSize:18, fontWeight:700, margin:0, letterSpacing:-0.3}}>{title}</p>
-        {subtitle && <p style={{fontSize:12, margin:"2px 0 0", opacity:dark?0.8:0.6}}>{subtitle}</p>}
-      </div>
-      {right}
-    </div>
-  </div>
-);
 
 // ─── HOME ───
 const HomeScreen = ({txs, period, setPeriod, years, onCopyBudget, setTab, setSubPage, setEditTx, setAddOpen, openUpgrade, user}) => {
@@ -1438,35 +1311,6 @@ const ShareScreen = ({txs, setSubPage}) => {
         )}
       </div>
     </>
-  );
-};
-
-// ─── BOTTOM NAV ───
-const BottomNav = ({tab, setTab, setAddOpen, setEditTx}) => {
-  const items = [
-    {id:"home", icon:Home, label:"Beranda"},
-    {id:"reports", icon:BarChart3, label:"Laporan"},
-    {id:"fab", icon:Plus, label:"", fab:true},
-    {id:"goals-tab", icon:Target, label:"Goals"},
-    {id:"more", icon:LayoutGrid, label:"Lainnya"},
-  ];
-  return (
-    <div style={{position:"fixed", bottom:0, left:"50%", transform:"translateX(-50%)", width:"100%", maxWidth:430, background:"#fff", borderTop:`1px solid ${C.borderL}`, display:"flex", alignItems:"center", padding:"6px 4px 10px", zIndex:50, boxSizing:"border-box", boxShadow:"0 -4px 20px rgba(0,0,0,0.04)"}}>
-      {items.map(n=>(
-        n.fab ? (
-          <button key={n.id} onClick={()=>{setEditTx(null); setAddOpen(true);}} style={{flex:1, display:"flex", justifyContent:"center", background:"none", border:"none", padding:0, cursor:"pointer"}}>
-            <div style={{width:52, height:52, background:`linear-gradient(135deg, ${C.pri}, ${C.priD})`, borderRadius:16, display:"flex", alignItems:"center", justifyContent:"center", marginTop:-22, boxShadow:`0 8px 20px rgba(22,163,74,0.4)`}}>
-              <Plus size={26} color="#fff" strokeWidth={2.5}/>
-            </div>
-          </button>
-        ) : (
-          <button key={n.id} onClick={()=>setTab(n.id)} style={{flex:1, display:"flex", flexDirection:"column", alignItems:"center", padding:"6px 0", background:"none", border:"none", cursor:"pointer", color: tab===n.id ? C.pri : C.textL, gap:3}}>
-            <n.icon size={20} strokeWidth={tab===n.id ? 2.5 : 2}/>
-            <span style={{fontSize:10, fontWeight:tab===n.id?700:500}}>{n.label}</span>
-          </button>
-        )
-      ))}
-    </div>
   );
 };
 
