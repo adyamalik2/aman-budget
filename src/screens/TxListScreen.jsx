@@ -12,6 +12,7 @@ import { formatPeriodLabel, formatShortDate } from "../utils/period";
 const TxListScreen = ({txs, allTxs, goals = [], period, setPeriod, years, onCopyBudget, onDeletePeriod, setSubPage, setEditTx, setAddOpen, onDelete, onDone}) => {
   const [fS, setFS] = useState("all");
   const [fG] = useState("all");
+  const [fGoal, setFGoal] = useState("all");
   const [q, setQ] = useState("");
   const [deleteOpen, setDeleteOpen] = useState(false);
   const periodLabel = formatPeriodLabel(period);
@@ -19,9 +20,11 @@ const TxListScreen = ({txs, allTxs, goals = [], period, setPeriod, years, onCopy
   const filtered = useMemo(()=>txs.filter(tx=>{
     if(fS!=="all"&&tx.status!==fS) return false;
     if(fG!=="all"&&tx.grp!==fG) return false;
+    if(fGoal==="none"&&tx.goalId) return false;
+    if(fGoal!=="all"&&fGoal!=="none"&&tx.goalId!==fGoal) return false;
     if(q&&!tx.desc.toLowerCase().includes(q.toLowerCase())) return false;
     return true;
-  }).sort((a,b)=>b.date.localeCompare(a.date)),[txs,fS,fG,q]);
+  }).sort((a,b)=>b.date.localeCompare(a.date)),[txs,fS,fG,fGoal,q]);
 
   return (
     <div style={{flex:1, overflowY:"auto", paddingBottom:92, background:C.bg}}>
@@ -51,11 +54,22 @@ const TxListScreen = ({txs, allTxs, goals = [], period, setPeriod, years, onCopy
         </div>
       </div>
 
-      <div style={{background:"#fff", padding:"10px 14px", borderBottom:`1px solid ${C.borderL}`, display:"flex", flexDirection:"column", gap:6}}>
+      <div style={{background:"#fff", padding:"10px 14px", borderBottom:`1px solid ${C.borderL}`, display:"flex", flexDirection:"column", gap:8}}>
         <div style={{display:"flex", gap:6, overflowX:"auto", paddingBottom:2}}>
           <Pill active={fS==="all"} onClick={()=>setFS("all")}>Semua</Pill>
           {Object.entries(STATUS).map(([v,s])=><Pill key={v} active={fS===v} onClick={()=>setFS(v)}>{s.label}</Pill>)}
         </div>
+        {goals.length > 0 && (
+          <div style={{display:"flex", alignItems:"center", gap:8}}>
+            <span style={{fontSize:11, fontWeight:700, color:C.textM, flexShrink:0}}>Goal:</span>
+            <select value={fGoal} onChange={e=>setFGoal(e.target.value)}
+              style={{flex:1, fontSize:11, padding:"5px 8px", borderRadius:8, border:`1px solid ${fGoal!=="all"?C.pri:C.border}`, background:"#fff", color:fGoal!=="all"?C.pri:C.text, fontWeight:fGoal!=="all"?"700":"400", outline:"none", cursor:"pointer"}}>
+              <option value="all">Semua Goal</option>
+              <option value="none">Tidak terkait goal</option>
+              {goals.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}
+            </select>
+          </div>
+        )}
       </div>
 
       <div style={{padding:"12px 14px"}}>
