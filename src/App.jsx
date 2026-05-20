@@ -74,6 +74,7 @@ const STORAGE_KEYS = {
   txs: "amanBudget.transactions",
   goals: "amanBudget.goals",
   user: "amanBudget.user",
+  period: "amanBudget.period",
 };
 
 const loadStored = (key, fallback, validate = () => true) => {
@@ -105,14 +106,67 @@ const removeStored = key => {
 
 const getDefaultPeriod = () => {
   const now = new Date();
-  return {month: now.getMonth() + 1, year: now.getFullYear()};
+  const month = now.getMonth() + 1;
+  const year = now.getFullYear();
+  return {mode:"month", month, year, startMonth:month, startYear:year, endMonth:month, endYear:year};
 };
 
-const formatPeriodLabel = period => `${MONTHS[period.month - 1]} ${period.year}`;
+const validMonth = value => Number.isInteger(value) && value >= 1 && value <= 12;
+const validYear = value => Number.isInteger(value) && value > 1900 && value < 3000;
+
+const monthKey = (year, month) => year * 12 + month;
+
+const normalizePeriod = period => {
+  const fallback = getDefaultPeriod();
+  const month = validMonth(Number(period?.month)) ? Number(period.month) : fallback.month;
+  const year = validYear(Number(period?.year)) ? Number(period.year) : fallback.year;
+  const startMonth = validMonth(Number(period?.startMonth)) ? Number(period.startMonth) : month;
+  const startYear = validYear(Number(period?.startYear)) ? Number(period.startYear) : year;
+  let endMonth = validMonth(Number(period?.endMonth)) ? Number(period.endMonth) : startMonth;
+  let endYear = validYear(Number(period?.endYear)) ? Number(period.endYear) : startYear;
+  if(monthKey(endYear, endMonth) < monthKey(startYear, startMonth)) {
+    endMonth = startMonth;
+    endYear = startYear;
+  }
+  return {
+    mode: period?.mode === "range" ? "range" : "month",
+    month,
+    year,
+    startMonth,
+    startYear,
+    endMonth,
+    endYear,
+  };
+};
+
+const formatMonthYear = (month, year) => `${MONTHS[month - 1]} ${year}`;
+
+const formatPeriodLabel = period => {
+  const p = normalizePeriod(period);
+  if(p.mode === "range") return `${formatMonthYear(p.startMonth, p.startYear)} - ${formatMonthYear(p.endMonth, p.endYear)}`;
+  return formatMonthYear(p.month, p.year);
+};
 
 const isTxInPeriod = (tx, period) => {
   const [year, month] = (tx.date || "").split("-").map(Number);
-  return year === period.year && month === period.month;
+  if(!validYear(year)||!validMonth(month)) return false;
+  const p = normalizePeriod(period);
+  if(p.mode === "range") {
+    const txKey = monthKey(year, month);
+    return txKey >= monthKey(p.startYear, p.startMonth) && txKey <= monthKey(p.endYear, p.endMonth);
+  }
+  return year === p.year && month === p.month;
+};
+
+const getPeriodYears = (txs, period) => {
+  const p = normalizePeriod(period);
+  const currentYear = new Date().getFullYear();
+  const years = new Set([currentYear, currentYear + 1, p.year, p.startYear, p.endYear]);
+  txs.forEach(tx=>{
+    const year = Number((tx.date || "").slice(0, 4));
+    if(validYear(year)) years.add(year);
+  });
+  return [...years].sort((a,b)=>a-b);
 };
 
 // ─── Calc helpers ───
@@ -183,8 +237,9 @@ const Badge = ({children, bg, color}) => (
   </span>
 );
 
-const PeriodPicker = ({period, setPeriod, dark=false, style={}}) => {
-  const years = Array.from({length:7}, (_,i)=>period.year - 3 + i);
+const PeriodPicker = ({period, setPeriod, years, dark=false, style={}}) => {
+  const p = normalizePeriod(period);
+  const labelColor = dark ? "rgba(255,255,255,0.8)" : C.textM;
   const selectStyle = {
     border: dark ? "1px solid rgba(255,255,255,0.35)" : `1px solid ${C.border}`,
     background: dark ? "rgba(255,255,255,0.16)" : "#fff",
@@ -194,16 +249,67 @@ const PeriodPicker = ({period, setPeriod, dark=false, style={}}) => {
     fontSize:12,
     fontWeight:700,
     outline:"none",
+    colorScheme:"light",
+    width:"100%",
+    minWidth:0,
+    boxSizing:"border-box",
   };
+  const optionStyle = {color:C.text, background:"#fff"};
+  const periodSelectorStyle = {display:"flex", flexDirection:"column", gap:8, width:"100%", ...style};
+  const periodHeaderStyle = {display:"flex", alignItems:"center", gap:8, flexWrap:"wrap"};
+  const periodLabelStyle = {fontSize:11, fontWeight:700, color:labelColor, minWidth:60};
+  const singleRowStyle = {display:"grid", gridTemplateColumns:"minmax(0, 1fr) 110px", gap:8, width:"100%"};
+  const rangeWrapStyle = {display:"flex", flexDirection:"column", gap:6, width:"100%"};
+  const rangeRowStyle = {display:"grid", gridTemplateColumns:"60px minmax(0, 1fr) 110px", gap:8, alignItems:"center", width:"100%"};
+  const set = changes => setPeriod(prev=>normalizePeriod({...prev, ...changes}));
+  const modeBtn = active => ({
+    border:"none",
+    borderRadius:9,
+    padding:"8px 10px",
+    fontSize:12,
+    fontWeight:800,
+    cursor:"pointer",
+    background: active ? (dark ? "#fff" : C.pri) : (dark ? "rgba(255,255,255,0.14)" : C.borderL),
+    color: active ? (dark ? C.priD : "#fff") : (dark ? "rgba(255,255,255,0.82)" : C.textM),
+  });
+  const monthSelect = (value, onChange, label) => (
+    <select aria-label={label} style={selectStyle} value={value} onChange={onChange}>
+      {MONTHS.map((m,i)=><option key={m} value={i+1} style={optionStyle}>{m}</option>)}
+    </select>
+  );
+  const yearSelect = (value, onChange, label) => (
+    <select aria-label={label} style={selectStyle} value={value} onChange={onChange}>
+      {years.map(y=><option key={y} value={y} style={optionStyle}>{y}</option>)}
+    </select>
+  );
   return (
-    <div style={{display:"flex", alignItems:"center", gap:6, ...style}}>
-      <span style={{fontSize:11, fontWeight:700, color:dark?"rgba(255,255,255,0.8)":C.textM}}>Periode</span>
-      <select aria-label="Bulan" style={{...selectStyle, minWidth:96}} value={period.month} onChange={e=>setPeriod(p=>({...p, month:Number(e.target.value)}))}>
-        {MONTHS.map((m,i)=><option key={m} value={i+1}>{m}</option>)}
-      </select>
-      <select aria-label="Tahun" style={{...selectStyle, minWidth:76}} value={period.year} onChange={e=>setPeriod(p=>({...p, year:Number(e.target.value)}))}>
-        {years.map(y=><option key={y} value={y}>{y}</option>)}
-      </select>
+    <div style={periodSelectorStyle}>
+      <div style={periodHeaderStyle}>
+        <span style={{...periodLabelStyle, minWidth:"auto"}}>Periode</span>
+        <div style={{display:"flex", gap:4, background:dark?"rgba(255,255,255,0.12)":C.borderL, borderRadius:11, padding:2}}>
+          <button type="button" onClick={()=>set({mode:"month"})} style={modeBtn(p.mode==="month")}>Bulanan</button>
+          <button type="button" onClick={()=>set({mode:"range"})} style={modeBtn(p.mode==="range")}>Range</button>
+        </div>
+      </div>
+      {p.mode === "range" ? (
+        <div style={rangeWrapStyle}>
+          <div style={rangeRowStyle}>
+            <span style={periodLabelStyle}>Dari</span>
+            {monthSelect(p.startMonth, e=>set({startMonth:Number(e.target.value)}), "Bulan mulai")}
+            {yearSelect(p.startYear, e=>set({startYear:Number(e.target.value)}), "Tahun mulai")}
+          </div>
+          <div style={rangeRowStyle}>
+            <span style={periodLabelStyle}>Sampai</span>
+            {monthSelect(p.endMonth, e=>set({endMonth:Number(e.target.value)}), "Bulan selesai")}
+            {yearSelect(p.endYear, e=>set({endYear:Number(e.target.value)}), "Tahun selesai")}
+          </div>
+        </div>
+      ) : (
+        <div style={singleRowStyle}>
+          {monthSelect(p.month, e=>set({month:Number(e.target.value)}), "Bulan")}
+          {yearSelect(p.year, e=>set({year:Number(e.target.value)}), "Tahun")}
+        </div>
+      )}
     </div>
   );
 };
@@ -283,11 +389,12 @@ const Header = ({title, subtitle, onBack, right, dark=true}) => (
 );
 
 // ─── HOME ───
-const HomeScreen = ({txs, period, setPeriod, setTab, setSubPage, setEditTx, setAddOpen, openUpgrade, user}) => {
+const HomeScreen = ({txs, period, setPeriod, years, setTab, setSubPage, setEditTx, setAddOpen, openUpgrade, user}) => {
   const s = calcSummary(txs);
   const grps = calcGroups(txs);
   const unpaidItems = txs.filter(x=>x.status==="belum_selesai").slice(0, 3);
   const recent = [...txs].sort((a,b)=>b.date.localeCompare(a.date)).slice(0, 4);
+  const periodMode = normalizePeriod(period).mode;
   const periodLabel = formatPeriodLabel(period);
 
   return (
@@ -330,7 +437,7 @@ const HomeScreen = ({txs, period, setPeriod, setTab, setSubPage, setEditTx, setA
               <p style={{fontSize:14, fontWeight:700, margin:0}}>{fmtS(s.paid)}</p>
             </div>
           </div>
-          <PeriodPicker period={period} setPeriod={setPeriod} dark style={{marginTop:14}}/>
+          <PeriodPicker period={period} setPeriod={setPeriod} years={years} dark style={{marginTop:14}}/>
         </div>
       </div>
 
@@ -357,7 +464,7 @@ const HomeScreen = ({txs, period, setPeriod, setTab, setSubPage, setEditTx, setA
         <div style={{...card, background:`linear-gradient(135deg, #fff 0%, ${C.priBg} 100%)`}}>
           <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8}}>
             <div>
-              <p style={{fontSize:11, color:C.textM, margin:0, fontWeight:600, letterSpacing:0.3}}>PROGRESS BULAN INI</p>
+              <p style={{fontSize:11, color:C.textM, margin:0, fontWeight:600, letterSpacing:0.3}}>{periodMode==="range"?"PROGRESS PERIODE":"PROGRESS BULAN INI"}</p>
               <p style={{fontSize:22, fontWeight:800, color:C.priD, margin:"2px 0 0"}}>{s.prog}%</p>
             </div>
             <div style={{textAlign:"right"}}>
@@ -447,7 +554,7 @@ const HomeScreen = ({txs, period, setPeriod, setTab, setSubPage, setEditTx, setA
 };
 
 // ─── REPORTS ───
-const ReportsScreen = ({txs, period, setPeriod, openUpgrade}) => {
+const ReportsScreen = ({txs, period, setPeriod, years, openUpgrade}) => {
   const s = calcSummary(txs);
   const grps = calcGroups(txs);
   const pieData = Object.entries(grps).map(([k,v])=>({name:GROUPS[k]?.label, value:v.budget, color:GROUPS[k]?.color}));
@@ -462,7 +569,7 @@ const ReportsScreen = ({txs, period, setPeriod, openUpgrade}) => {
 
       <div style={{padding:"14px", display:"flex", flexDirection:"column", gap:12}}>
         <div style={card}>
-          <PeriodPicker period={period} setPeriod={setPeriod}/>
+          <PeriodPicker period={period} setPeriod={setPeriod} years={years}/>
         </div>
 
         {/* Stats summary */}
@@ -755,7 +862,7 @@ const ZakatScreen = ({setSubPage}) => {
 };
 
 // ─── TX LIST ───
-const TxListScreen = ({txs, period, setPeriod, setSubPage, setEditTx, setAddOpen, onDelete, onDone}) => {
+const TxListScreen = ({txs, period, setPeriod, years, setSubPage, setEditTx, setAddOpen, onDelete, onDone}) => {
   const [fS, setFS] = useState("all");
   const [fG] = useState("all");
   const [q, setQ] = useState("");
@@ -788,7 +895,7 @@ const TxListScreen = ({txs, period, setPeriod, setSubPage, setEditTx, setAddOpen
           <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Cari transaksi..."
             style={{width:"100%", background:"rgba(255,255,255,0.15)", border:"none", borderRadius:12, padding:"10px 14px 10px 36px", color:"#fff", fontSize:13, outline:"none", boxSizing:"border-box"}}/>
         </div>
-        <PeriodPicker period={period} setPeriod={setPeriod} dark style={{marginTop:10}}/>
+        <PeriodPicker period={period} setPeriod={setPeriod} years={years} dark style={{marginTop:10}}/>
       </div>
 
       <div style={{background:"#fff", padding:"10px 14px", borderBottom:`1px solid ${C.borderL}`, display:"flex", flexDirection:"column", gap:6}}>
@@ -1434,16 +1541,18 @@ export default function App() {
   const [editTx, setEditTx] = useState(null);
   const [txs, setTxs] = useState(() => loadStored(STORAGE_KEYS.txs, INIT_TX, Array.isArray));
   const [goals] = useState(() => loadStored(STORAGE_KEYS.goals, INIT_GOALS, Array.isArray));
-  const [period, setPeriod] = useState(getDefaultPeriod);
+  const [period, setPeriod] = useState(() => normalizePeriod(loadStored(STORAGE_KEYS.period, getDefaultPeriod(), v=>v&&typeof v==="object"&&!Array.isArray(v))));
 
   useEffect(()=>{ saveStored(STORAGE_KEYS.txs, txs); }, [txs]);
   useEffect(()=>{ saveStored(STORAGE_KEYS.goals, goals); }, [goals]);
+  useEffect(()=>{ saveStored(STORAGE_KEYS.period, normalizePeriod(period)); }, [period]);
   useEffect(()=>{
     if(user) saveStored(STORAGE_KEYS.user, user);
     else removeStored(STORAGE_KEYS.user);
   }, [user]);
 
   const periodTxs = useMemo(()=>txs.filter(tx=>isTxInPeriod(tx, period)), [txs, period]);
+  const periodYears = useMemo(()=>getPeriodYears(txs, period), [txs, period]);
 
   const onSave = tx => setTxs(p=>{
     const i = p.findIndex(x=>x.id===tx.id);
@@ -1460,10 +1569,10 @@ export default function App() {
     if(subPage==="upgrade") return <UpgradeScreen setSubPage={setSubPage}/>;
     if(subPage==="transfer") return <TransferScreen txs={txs} setSubPage={setSubPage}/>;
     if(subPage==="zakat") return <ZakatScreen setSubPage={setSubPage}/>;
-    if(subPage==="tx-list") return <TxListScreen txs={periodTxs} period={period} setPeriod={setPeriod} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} onDelete={onDelete} onDone={onDone}/>;
+    if(subPage==="tx-list") return <TxListScreen txs={periodTxs} period={period} setPeriod={setPeriod} years={periodYears} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} onDelete={onDelete} onDone={onDone}/>;
     if(subPage==="share") return <ShareScreen txs={txs} setSubPage={setSubPage}/>;
-    if(tab==="home") return <HomeScreen txs={periodTxs} period={period} setPeriod={setPeriod} setTab={setTab} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} openUpgrade={openUpgrade} user={user}/>;
-    if(tab==="reports") return <ReportsScreen txs={periodTxs} period={period} setPeriod={setPeriod} openUpgrade={openUpgrade}/>;
+    if(tab==="home") return <HomeScreen txs={periodTxs} period={period} setPeriod={setPeriod} years={periodYears} setTab={setTab} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} openUpgrade={openUpgrade} user={user}/>;
+    if(tab==="reports") return <ReportsScreen txs={periodTxs} period={period} setPeriod={setPeriod} years={periodYears} openUpgrade={openUpgrade}/>;
     if(tab==="goals-tab") return <GoalsScreen goals={goals} openUpgrade={openUpgrade}/>;
     if(tab==="more") return <MoreScreen setSubPage={setSubPage} openUpgrade={openUpgrade} onLogout={()=>setUser(null)}/>;
     return null;
