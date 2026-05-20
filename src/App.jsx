@@ -138,7 +138,7 @@ export default function App() {
     if(subPage==="share") return <ShareScreen txs={txs} setSubPage={setSubPage}/>;
     if(tab==="home") return <HomeScreen txs={periodTxs} period={period} setPeriod={setPeriod} years={periodYears} onCopyBudget={onCopyBudget} setTab={setTab} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} openUpgrade={openUpgrade} user={user}/>;
     if(tab==="reports") return <ReportsScreen txs={periodTxs} period={period} setPeriod={setPeriod} years={periodYears} openUpgrade={openUpgrade}/>;
-    if(tab==="goals-tab") return <GoalsScreen goals={goals} openUpgrade={openUpgrade} onAddSaving={onAddGoalSaving}/>;
+    if(tab==="goals-tab") return <GoalsScreen goals={goals} txs={txs} openUpgrade={openUpgrade} onAddSaving={onAddGoalSaving}/>;
     if(tab==="more") return <MoreScreen setSubPage={setSubPage} openUpgrade={openUpgrade} onLogout={()=>setUser(null)} onExportBackup={onExportBackup} onImportBackup={onImportBackup}/>;
     return null;
   };
