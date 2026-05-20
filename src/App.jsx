@@ -68,6 +68,8 @@ const INIT_GOALS = [
   {id:"g3", name:"Dana Darurat", target:30000000, saved:22000000, deadline:"Des 2026", icon:"shield", color:"#d97706"},
 ];
 
+const MONTHS = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+
 const STORAGE_KEYS = {
   txs: "amanBudget.transactions",
   goals: "amanBudget.goals",
@@ -101,6 +103,18 @@ const removeStored = key => {
   }
 };
 
+const getDefaultPeriod = () => {
+  const now = new Date();
+  return {month: now.getMonth() + 1, year: now.getFullYear()};
+};
+
+const formatPeriodLabel = period => `${MONTHS[period.month - 1]} ${period.year}`;
+
+const isTxInPeriod = (tx, period) => {
+  const [year, month] = (tx.date || "").split("-").map(Number);
+  return year === period.year && month === period.month;
+};
+
 // ─── Calc helpers ───
 const calcSummary = txs => {
   const totalIncome = txs.filter(x=>x.type==="income").reduce((s,x)=>s+x.amt,0);
@@ -125,6 +139,18 @@ const calcGroups = txs => {
     if(x.status==="belum_selesai") r[k].unpaid += x.amt;
   });
   return r;
+};
+
+const calcWeekData = txs => {
+  const weeks = Array.from({length:5}, (_,i)=>({w:`M${i+1}`, in:0, out:0}));
+  txs.forEach(tx=>{
+    const day = Number((tx.date || "").slice(8, 10));
+    if(!day) return;
+    const idx = Math.min(Math.floor((day - 1) / 7), 4);
+    if(tx.type==="income") weeks[idx].in += tx.amt;
+    if(tx.type==="expense"&&tx.status==="selesai") weeks[idx].out += tx.amt;
+  });
+  return weeks;
 };
 
 // ─── Reusable UI ───
@@ -156,6 +182,31 @@ const Badge = ({children, bg, color}) => (
     {children}
   </span>
 );
+
+const PeriodPicker = ({period, setPeriod, dark=false, style={}}) => {
+  const years = Array.from({length:7}, (_,i)=>period.year - 3 + i);
+  const selectStyle = {
+    border: dark ? "1px solid rgba(255,255,255,0.35)" : `1px solid ${C.border}`,
+    background: dark ? "rgba(255,255,255,0.16)" : "#fff",
+    color: dark ? "#fff" : C.text,
+    borderRadius:10,
+    padding:"8px 10px",
+    fontSize:12,
+    fontWeight:700,
+    outline:"none",
+  };
+  return (
+    <div style={{display:"flex", alignItems:"center", gap:6, ...style}}>
+      <span style={{fontSize:11, fontWeight:700, color:dark?"rgba(255,255,255,0.8)":C.textM}}>Periode</span>
+      <select aria-label="Bulan" style={{...selectStyle, minWidth:96}} value={period.month} onChange={e=>setPeriod(p=>({...p, month:Number(e.target.value)}))}>
+        {MONTHS.map((m,i)=><option key={m} value={i+1}>{m}</option>)}
+      </select>
+      <select aria-label="Tahun" style={{...selectStyle, minWidth:76}} value={period.year} onChange={e=>setPeriod(p=>({...p, year:Number(e.target.value)}))}>
+        {years.map(y=><option key={y} value={y}>{y}</option>)}
+      </select>
+    </div>
+  );
+};
 
 // ─── LOGIN ───
 const LoginScreen = ({onLogin}) => {
@@ -232,11 +283,12 @@ const Header = ({title, subtitle, onBack, right, dark=true}) => (
 );
 
 // ─── HOME ───
-const HomeScreen = ({txs, setTab, setSubPage, setEditTx, setAddOpen, openUpgrade, user}) => {
+const HomeScreen = ({txs, period, setPeriod, setTab, setSubPage, setEditTx, setAddOpen, openUpgrade, user}) => {
   const s = calcSummary(txs);
   const grps = calcGroups(txs);
   const unpaidItems = txs.filter(x=>x.status==="belum_selesai").slice(0, 3);
   const recent = [...txs].sort((a,b)=>b.date.localeCompare(a.date)).slice(0, 4);
+  const periodLabel = formatPeriodLabel(period);
 
   return (
     <div style={{flex:1, overflowY:"auto", paddingBottom:92, background:C.bg}}>
@@ -260,7 +312,7 @@ const HomeScreen = ({txs, setTab, setSubPage, setEditTx, setAddOpen, openUpgrade
 
         {/* Balance card */}
         <div>
-          <p style={{fontSize:11, margin:"0 0 4px", opacity:0.85, fontWeight:500}}>SALDO AKTUAL · MEI 2026</p>
+          <p style={{fontSize:11, margin:"0 0 4px", opacity:0.85, fontWeight:500}}>SALDO AKTUAL · {periodLabel.toUpperCase()}</p>
           <p style={{fontSize:32, fontWeight:800, margin:0, letterSpacing:-1}}>{fmt(s.actBal)}</p>
           <div style={{display:"flex", gap:12, marginTop:12}}>
             <div style={{flex:1, background:"rgba(255,255,255,0.15)", borderRadius:12, padding:"10px 12px", backdropFilter:"blur(8px)"}}>
@@ -278,6 +330,7 @@ const HomeScreen = ({txs, setTab, setSubPage, setEditTx, setAddOpen, openUpgrade
               <p style={{fontSize:14, fontWeight:700, margin:0}}>{fmtS(s.paid)}</p>
             </div>
           </div>
+          <PeriodPicker period={period} setPeriod={setPeriod} dark style={{marginTop:14}}/>
         </div>
       </div>
 
@@ -394,25 +447,24 @@ const HomeScreen = ({txs, setTab, setSubPage, setEditTx, setAddOpen, openUpgrade
 };
 
 // ─── REPORTS ───
-const ReportsScreen = ({txs, openUpgrade}) => {
+const ReportsScreen = ({txs, period, setPeriod, openUpgrade}) => {
   const s = calcSummary(txs);
   const grps = calcGroups(txs);
   const pieData = Object.entries(grps).map(([k,v])=>({name:GROUPS[k]?.label, value:v.budget, color:GROUPS[k]?.color}));
-
-  const weekData = [
-    {w:"M1", in:5000000, out:3500000},
-    {w:"M2", in:0, out:2000000},
-    {w:"M3", in:3500000, out:1500000},
-    {w:"M4", in:15000000, out:1800000},
-  ];
+  const weekData = calcWeekData(txs);
+  const periodLabel = formatPeriodLabel(period);
 
   const top5 = txs.filter(x=>x.type==="expense"&&x.status!=="batal").sort((a,b)=>b.amt-a.amt).slice(0,5);
 
   return (
     <div style={{flex:1, overflowY:"auto", paddingBottom:92, background:C.bg}}>
-      <Header title="Laporan" subtitle="Mei 2026"/>
+      <Header title="Laporan" subtitle={periodLabel}/>
 
       <div style={{padding:"14px", display:"flex", flexDirection:"column", gap:12}}>
+        <div style={card}>
+          <PeriodPicker period={period} setPeriod={setPeriod}/>
+        </div>
+
         {/* Stats summary */}
         <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:10}}>
           <div style={{...card, background:`linear-gradient(135deg, ${C.priBg}, #fff)`}}>
@@ -703,10 +755,11 @@ const ZakatScreen = ({setSubPage}) => {
 };
 
 // ─── TX LIST ───
-const TxListScreen = ({txs, setSubPage, setEditTx, setAddOpen, onDelete, onDone}) => {
+const TxListScreen = ({txs, period, setPeriod, setSubPage, setEditTx, setAddOpen, onDelete, onDone}) => {
   const [fS, setFS] = useState("all");
   const [fG] = useState("all");
   const [q, setQ] = useState("");
+  const periodLabel = formatPeriodLabel(period);
 
   const filtered = useMemo(()=>txs.filter(tx=>{
     if(fS!=="all"&&tx.status!==fS) return false;
@@ -722,7 +775,10 @@ const TxListScreen = ({txs, setSubPage, setEditTx, setAddOpen, onDelete, onDone}
           <button onClick={()=>setSubPage(null)} style={{background:"none", border:"none", padding:0, cursor:"pointer", color:"#fff", display:"flex"}}>
             <ChevronLeft size={26}/>
           </button>
-          <p style={{fontSize:18, fontWeight:700, margin:0, flex:1}}>Transaksi</p>
+          <div style={{flex:1}}>
+            <p style={{fontSize:18, fontWeight:700, margin:0}}>Transaksi</p>
+            <p style={{fontSize:12, margin:"2px 0 0", opacity:0.8}}>{periodLabel}</p>
+          </div>
           <button style={{background:"rgba(255,255,255,0.2)", border:"none", borderRadius:10, padding:8, cursor:"pointer", color:"#fff", display:"flex"}}>
             <Filter size={16}/>
           </button>
@@ -732,6 +788,7 @@ const TxListScreen = ({txs, setSubPage, setEditTx, setAddOpen, onDelete, onDone}
           <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Cari transaksi..."
             style={{width:"100%", background:"rgba(255,255,255,0.15)", border:"none", borderRadius:12, padding:"10px 14px 10px 36px", color:"#fff", fontSize:13, outline:"none", boxSizing:"border-box"}}/>
         </div>
+        <PeriodPicker period={period} setPeriod={setPeriod} dark style={{marginTop:10}}/>
       </div>
 
       <div style={{background:"#fff", padding:"10px 14px", borderBottom:`1px solid ${C.borderL}`, display:"flex", flexDirection:"column", gap:6}}>
@@ -1377,6 +1434,7 @@ export default function App() {
   const [editTx, setEditTx] = useState(null);
   const [txs, setTxs] = useState(() => loadStored(STORAGE_KEYS.txs, INIT_TX, Array.isArray));
   const [goals] = useState(() => loadStored(STORAGE_KEYS.goals, INIT_GOALS, Array.isArray));
+  const [period, setPeriod] = useState(getDefaultPeriod);
 
   useEffect(()=>{ saveStored(STORAGE_KEYS.txs, txs); }, [txs]);
   useEffect(()=>{ saveStored(STORAGE_KEYS.goals, goals); }, [goals]);
@@ -1384,6 +1442,8 @@ export default function App() {
     if(user) saveStored(STORAGE_KEYS.user, user);
     else removeStored(STORAGE_KEYS.user);
   }, [user]);
+
+  const periodTxs = useMemo(()=>txs.filter(tx=>isTxInPeriod(tx, period)), [txs, period]);
 
   const onSave = tx => setTxs(p=>{
     const i = p.findIndex(x=>x.id===tx.id);
@@ -1400,10 +1460,10 @@ export default function App() {
     if(subPage==="upgrade") return <UpgradeScreen setSubPage={setSubPage}/>;
     if(subPage==="transfer") return <TransferScreen txs={txs} setSubPage={setSubPage}/>;
     if(subPage==="zakat") return <ZakatScreen setSubPage={setSubPage}/>;
-    if(subPage==="tx-list") return <TxListScreen txs={txs} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} onDelete={onDelete} onDone={onDone}/>;
+    if(subPage==="tx-list") return <TxListScreen txs={periodTxs} period={period} setPeriod={setPeriod} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} onDelete={onDelete} onDone={onDone}/>;
     if(subPage==="share") return <ShareScreen txs={txs} setSubPage={setSubPage}/>;
-    if(tab==="home") return <HomeScreen txs={txs} setTab={setTab} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} openUpgrade={openUpgrade} user={user}/>;
-    if(tab==="reports") return <ReportsScreen txs={txs} openUpgrade={openUpgrade}/>;
+    if(tab==="home") return <HomeScreen txs={periodTxs} period={period} setPeriod={setPeriod} setTab={setTab} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} openUpgrade={openUpgrade} user={user}/>;
+    if(tab==="reports") return <ReportsScreen txs={periodTxs} period={period} setPeriod={setPeriod} openUpgrade={openUpgrade}/>;
     if(tab==="goals-tab") return <GoalsScreen goals={goals} openUpgrade={openUpgrade}/>;
     if(tab==="more") return <MoreScreen setSubPage={setSubPage} openUpgrade={openUpgrade} onLogout={()=>setUser(null)}/>;
     return null;
