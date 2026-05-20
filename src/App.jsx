@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import {
-  Home, BarChart3, Target, Plus, Search, X, Edit2, Trash2,
+  Home, BarChart3, Target, Plus, Search, X, Trash2,
   Bell, Crown, Sparkles, CheckCircle2, Clock,
   Users, ArrowRightLeft, Plane, GraduationCap, Shield,
   ChevronRight, ChevronLeft, Mail, Lock, Send, Calculator, LayoutGrid,
@@ -69,6 +69,7 @@ const INIT_GOALS = [
 ];
 
 const MONTHS = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+const MONTH_SHORT = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
 
 const STORAGE_KEYS = {
   txs: "amanBudget.transactions",
@@ -169,6 +170,53 @@ const getPeriodYears = (txs, period) => {
   return [...years].sort((a,b)=>a-b);
 };
 
+const getPrevMonthYear = (month, year) => month === 1 ? {month:12, year:year - 1} : {month:month - 1, year};
+
+const getLastDayOfMonth = (month, year) => new Date(year, month, 0).getDate();
+
+const shiftDateToTargetMonth = (date, targetMonth, targetYear) => {
+  const day = Number((date || "").slice(8, 10)) || 1;
+  const safeDay = Math.min(day, getLastDayOfMonth(targetMonth, targetYear));
+  return `${targetYear}-${String(targetMonth).padStart(2, "0")}-${String(safeDay).padStart(2, "0")}`;
+};
+
+const copyBudgetFromPreviousMonth = (txs, period) => {
+  const p = normalizePeriod(period);
+  const prev = getPrevMonthYear(p.month, p.year);
+  const txKey = tx => [tx.type, tx.grp || "", tx.cat || "", tx.desc || "", Number(tx.amt) || 0].join("|");
+  const source = txs.filter(tx=>tx.status!=="batal"&&isTxInPeriod(tx, {mode:"month", month:prev.month, year:prev.year}));
+  const targetKeys = new Set(txs.filter(tx=>isTxInPeriod(tx, {mode:"month", month:p.month, year:p.year})).map(txKey));
+  const items = source
+    .filter(tx=>!targetKeys.has(txKey(tx)))
+    .map((tx,i)=>({
+      ...tx,
+      id:`copy-${Date.now()}-${i}`,
+      date:shiftDateToTargetMonth(tx.date, p.month, p.year),
+      status:"estimasi",
+    }));
+  return {items, sourceCount:source.length, prev};
+};
+
+const getTransactionsByPeriod = (txs, month, year) => txs.filter(tx=>isTxInPeriod(tx, {mode:"month", month, year}));
+
+const getTransactionsByRange = (txs, period) => txs.filter(tx=>isTxInPeriod(tx, {...normalizePeriod(period), mode:"range"}));
+
+const getDeletePeriodLabel = period => formatPeriodLabel(period);
+
+const deleteTransactionsByPeriod = (txs, period) => {
+  const p = normalizePeriod(period);
+  const deleted = p.mode==="range" ? getTransactionsByRange(txs, p) : getTransactionsByPeriod(txs, p.month, p.year);
+  const ids = new Set(deleted.map(tx=>tx.id));
+  return {deleted, next:txs.filter(tx=>!ids.has(tx.id))};
+};
+
+const formatShortDate = date => {
+  const month = Number((date || "").slice(5, 7));
+  const day = Number((date || "").slice(8, 10));
+  if(!validMonth(month)||!day) return date || "-";
+  return `${day} ${MONTH_SHORT[month - 1]}`;
+};
+
 // ─── Calc helpers ───
 const calcSummary = txs => {
   const totalIncome = txs.filter(x=>x.type==="income").reduce((s,x)=>s+x.amt,0);
@@ -237,7 +285,7 @@ const Badge = ({children, bg, color}) => (
   </span>
 );
 
-const PeriodPicker = ({period, setPeriod, years, dark=false, style={}}) => {
+const PeriodPicker = ({period, setPeriod, years, onCopyBudget, dark=false, style={}}) => {
   const p = normalizePeriod(period);
   const labelColor = dark ? "rgba(255,255,255,0.8)" : C.textM;
   const selectStyle = {
@@ -272,6 +320,16 @@ const PeriodPicker = ({period, setPeriod, years, dark=false, style={}}) => {
     background: active ? (dark ? "#fff" : C.pri) : (dark ? "rgba(255,255,255,0.14)" : C.borderL),
     color: active ? (dark ? C.priD : "#fff") : (dark ? "rgba(255,255,255,0.82)" : C.textM),
   });
+  const copyBtnStyle = {
+    border:dark?"1px solid rgba(255,255,255,0.35)":`1px solid ${C.pri}`,
+    background:dark?"rgba(255,255,255,0.16)":"#fff",
+    color:dark?"#fff":C.pri,
+    borderRadius:10,
+    padding:"8px 10px",
+    fontSize:12,
+    fontWeight:800,
+    cursor:"pointer",
+  };
   const monthSelect = (value, onChange, label) => (
     <select aria-label={label} style={selectStyle} value={value} onChange={onChange}>
       {MONTHS.map((m,i)=><option key={m} value={i+1} style={optionStyle}>{m}</option>)}
@@ -290,6 +348,9 @@ const PeriodPicker = ({period, setPeriod, years, dark=false, style={}}) => {
           <button type="button" onClick={()=>set({mode:"month"})} style={modeBtn(p.mode==="month")}>Bulanan</button>
           <button type="button" onClick={()=>set({mode:"range"})} style={modeBtn(p.mode==="range")}>Range</button>
         </div>
+        {p.mode==="month" && onCopyBudget && (
+          <button type="button" onClick={onCopyBudget} style={copyBtnStyle}>Copy Bulan Lalu</button>
+        )}
       </div>
       {p.mode === "range" ? (
         <div style={rangeWrapStyle}>
@@ -389,7 +450,7 @@ const Header = ({title, subtitle, onBack, right, dark=true}) => (
 );
 
 // ─── HOME ───
-const HomeScreen = ({txs, period, setPeriod, years, setTab, setSubPage, setEditTx, setAddOpen, openUpgrade, user}) => {
+const HomeScreen = ({txs, period, setPeriod, years, onCopyBudget, setTab, setSubPage, setEditTx, setAddOpen, openUpgrade, user}) => {
   const s = calcSummary(txs);
   const grps = calcGroups(txs);
   const unpaidItems = txs.filter(x=>x.status==="belum_selesai").slice(0, 3);
@@ -437,7 +498,7 @@ const HomeScreen = ({txs, period, setPeriod, years, setTab, setSubPage, setEditT
               <p style={{fontSize:14, fontWeight:700, margin:0}}>{fmtS(s.paid)}</p>
             </div>
           </div>
-          <PeriodPicker period={period} setPeriod={setPeriod} years={years} dark style={{marginTop:14}}/>
+          <PeriodPicker period={period} setPeriod={setPeriod} years={years} onCopyBudget={onCopyBudget} dark style={{marginTop:14}}/>
         </div>
       </div>
 
@@ -862,10 +923,11 @@ const ZakatScreen = ({setSubPage}) => {
 };
 
 // ─── TX LIST ───
-const TxListScreen = ({txs, period, setPeriod, years, setSubPage, setEditTx, setAddOpen, onDelete, onDone}) => {
+const TxListScreen = ({txs, allTxs, period, setPeriod, years, onCopyBudget, onDeletePeriod, setSubPage, setEditTx, setAddOpen, onDelete, onDone}) => {
   const [fS, setFS] = useState("all");
   const [fG] = useState("all");
   const [q, setQ] = useState("");
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const periodLabel = formatPeriodLabel(period);
 
   const filtered = useMemo(()=>txs.filter(tx=>{
@@ -895,7 +957,12 @@ const TxListScreen = ({txs, period, setPeriod, years, setSubPage, setEditTx, set
           <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Cari transaksi..."
             style={{width:"100%", background:"rgba(255,255,255,0.15)", border:"none", borderRadius:12, padding:"10px 14px 10px 36px", color:"#fff", fontSize:13, outline:"none", boxSizing:"border-box"}}/>
         </div>
-        <PeriodPicker period={period} setPeriod={setPeriod} years={years} dark style={{marginTop:10}}/>
+        <PeriodPicker period={period} setPeriod={setPeriod} years={years} onCopyBudget={onCopyBudget} dark style={{marginTop:10}}/>
+        <div style={{display:"flex", justifyContent:"flex-end", marginTop:8}}>
+          <button onClick={()=>setDeleteOpen(true)} style={{background:"rgba(255,255,255,0.16)", color:"#fff", border:"1px solid rgba(255,255,255,0.35)", borderRadius:10, padding:"8px 10px", fontSize:12, fontWeight:800, cursor:"pointer", display:"flex", alignItems:"center", gap:6}}>
+            <Trash2 size={13}/> Hapus Periode
+          </button>
+        </div>
       </div>
 
       <div style={{background:"#fff", padding:"10px 14px", borderBottom:`1px solid ${C.borderL}`, display:"flex", flexDirection:"column", gap:6}}>
@@ -905,42 +972,94 @@ const TxListScreen = ({txs, period, setPeriod, years, setSubPage, setEditTx, set
         </div>
       </div>
 
-      <div style={{padding:"12px 14px", display:"flex", flexDirection:"column", gap:8}}>
+      <div style={{padding:"12px 14px"}}>
         {filtered.length===0 && <p style={{textAlign:"center", color:C.textL, fontSize:13, padding:"3rem 0"}}>Tidak ada transaksi</p>}
-        {filtered.map(tx=>(
-          <div key={tx.id} style={card}>
-            <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:10}}>
-              <div style={{display:"flex", gap:10, flex:1, minWidth:0}}>
-                <div style={{width:38, height:38, borderRadius:11, background:tx.type==="income"?C.priL:GROUPS[tx.grp]?.color+"15", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0}}>
-                  {tx.type==="income" ? <TrendingUp size={17} color={C.pri}/> : <Receipt size={17} color={GROUPS[tx.grp]?.color||C.textM}/>}
+        {filtered.length > 0 && (
+          <div style={{background:"#fff", border:`1px solid ${C.borderL}`, borderRadius:12, overflow:"hidden"}}>
+            {filtered.map((tx,i)=>(
+              <div key={tx.id} style={{display:"grid", gridTemplateColumns:"42px minmax(0, 1fr) auto", gap:9, alignItems:"center", padding:"9px 10px", borderBottom:i<filtered.length-1?`1px solid ${C.borderL}`:"none", background:"#fff"}}>
+                <div style={{fontSize:11, fontWeight:800, color:C.textM, lineHeight:1.2, textAlign:"center"}}>{formatShortDate(tx.date)}</div>
+                <div style={{minWidth:0}}>
+                  <p style={{fontSize:13, fontWeight:700, color:C.text, margin:0, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", lineHeight:1.25}}>{tx.desc}</p>
+                  <div style={{display:"flex", alignItems:"center", gap:5, flexWrap:"wrap", marginTop:3}}>
+                    <span style={{fontSize:10, color:C.textL, fontWeight:600}}>
+                      {tx.type==="income"?"Pemasukan":`${tx.cat || "Pengeluaran"} · ${GROUPS[tx.grp]?.label || "Lain-lain"}`} · {tx.pay}
+                    </span>
+                    <Badge bg={STATUS[tx.status]?.bg} color={STATUS[tx.status]?.color}>{STATUS[tx.status]?.label}</Badge>
+                  </div>
                 </div>
-                <div style={{flex:1, minWidth:0}}>
-                  <p style={{fontSize:13, fontWeight:700, color:C.text, margin:0, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{tx.desc}</p>
-                  <p style={{fontSize:10, color:C.textL, margin:"2px 0 4px"}}>{tx.date} · {tx.type==="income"?"Pemasukan":GROUPS[tx.grp]?.label} · {tx.pay}</p>
-                  <Badge bg={STATUS[tx.status]?.bg} color={STATUS[tx.status]?.color}>{STATUS[tx.status]?.label}</Badge>
+                <div style={{display:"flex", flexDirection:"column", alignItems:"flex-end", gap:5}}>
+                  <p style={{fontSize:13, fontWeight:800, color:tx.type==="income"?C.pri:C.red, margin:0, whiteSpace:"nowrap"}}>
+                    {tx.type==="income"?"+":"-"}{fmtS(tx.amt)}
+                  </p>
+                  <div style={{display:"flex", gap:4, justifyContent:"flex-end", flexWrap:"wrap"}}>
+                    {tx.status==="belum_selesai" && (
+                      <button onClick={()=>onDone(tx.id)} style={{background:C.priL, color:C.priD, border:"none", borderRadius:7, padding:"4px 6px", fontSize:10, fontWeight:800, cursor:"pointer"}}>Lunas</button>
+                    )}
+                    <button onClick={()=>{setEditTx(tx); setAddOpen(true);}} style={{background:C.borderL, color:C.textM, border:"none", borderRadius:7, padding:"4px 6px", fontSize:10, fontWeight:800, cursor:"pointer"}}>Edit</button>
+                    <button onClick={()=>onDelete(tx.id)} aria-label="Hapus transaksi" style={{background:"#fef2f2", color:C.red, border:"none", borderRadius:7, padding:"4px 6px", cursor:"pointer", display:"flex"}}>
+                      <Trash2 size={12}/>
+                    </button>
+                  </div>
                 </div>
               </div>
-              <div style={{textAlign:"right"}}>
-                <p style={{fontSize:14, fontWeight:800, color:tx.type==="income"?C.pri:C.text, margin:0}}>
-                  {tx.type==="income"?"+":"−"}{fmtS(tx.amt)}
-                </p>
-              </div>
-            </div>
-            <div style={{display:"flex", gap:6, marginTop:10, paddingTop:8, borderTop:`1px solid ${C.borderL}`}}>
-              {tx.status==="belum_selesai" && (
-                <button onClick={()=>onDone(tx.id)} style={{flex:1, background:C.priL, color:C.priD, border:"none", borderRadius:9, padding:"7px", fontSize:11, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:4}}>
-                  <Check size={12}/> Lunas
-                </button>
-              )}
-              <button onClick={()=>{setEditTx(tx); setAddOpen(true);}} style={{flex:1, background:C.borderL, color:C.textM, border:"none", borderRadius:9, padding:"7px", fontSize:11, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:4}}>
-                <Edit2 size={11}/> Edit
-              </button>
-              <button onClick={()=>onDelete(tx.id)} style={{background:"#fef2f2", color:C.red, border:"none", borderRadius:9, padding:"7px 11px", cursor:"pointer"}}>
-                <Trash2 size={12}/>
-              </button>
-            </div>
+            ))}
           </div>
-        ))}
+        )}
+      </div>
+      {deleteOpen && <DeletePeriodSheet txs={allTxs} initialPeriod={period} onDelete={onDeletePeriod} onClose={()=>setDeleteOpen(false)}/>}
+    </div>
+  );
+};
+
+const DeletePeriodSheet = ({txs, initialPeriod, onDelete, onClose}) => {
+  const [deletePeriod, setDeletePeriod] = useState(() => normalizePeriod(initialPeriod));
+  const years = useMemo(()=>getPeriodYears(txs, deletePeriod), [txs, deletePeriod]);
+  const result = useMemo(()=>deleteTransactionsByPeriod(txs, deletePeriod), [txs, deletePeriod]);
+  const count = result.deleted.length;
+  const label = getDeletePeriodLabel(deletePeriod);
+
+  const handleDelete = () => {
+    if(count===0) {
+      alert(`Tidak ada transaksi pada ${label}.`);
+      return;
+    }
+    if(window.confirm(`Hapus ${count} transaksi pada ${label}?`)) {
+      onDelete(deletePeriod);
+      onClose();
+    }
+  };
+
+  return (
+    <div style={{position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:100, display:"flex", alignItems:"flex-end", justifyContent:"center"}}>
+      <div style={{width:"100%", maxWidth:430, background:"#fff", borderTopLeftRadius:24, borderTopRightRadius:24, maxHeight:"90vh", overflowY:"auto", animation:"slideUp 0.3s"}}>
+        <div style={{padding:"16px", borderBottom:`1px solid ${C.borderL}`, position:"sticky", top:0, background:"#fff", zIndex:2, display:"flex", alignItems:"center", justifyContent:"space-between"}}>
+          <p style={{fontSize:16, fontWeight:800, color:C.text, margin:0}}>Hapus Transaksi Periode</p>
+          <button onClick={onClose} style={{background:C.borderL, border:"none", borderRadius:10, padding:8, cursor:"pointer", display:"flex"}}>
+            <X size={16} color={C.textM}/>
+          </button>
+        </div>
+
+        <div style={{padding:"14px", display:"flex", flexDirection:"column", gap:12}}>
+          <div style={card}>
+            <PeriodPicker period={deletePeriod} setPeriod={setDeletePeriod} years={years}/>
+          </div>
+
+          <div style={{background:"#fef2f2", border:`1px solid ${C.redL}`, borderRadius:12, padding:"12px 14px"}}>
+            <p style={{fontSize:12, color:C.textM, margin:"0 0 4px", fontWeight:700}}>Akan dihapus</p>
+            <p style={{fontSize:16, color:C.red, margin:0, fontWeight:800}}>{count} transaksi</p>
+            <p style={{fontSize:11, color:C.textM, margin:"4px 0 0", lineHeight:1.4}}>{label}</p>
+          </div>
+
+          <div style={{display:"flex", gap:8}}>
+            <button onClick={onClose} style={{flex:1, padding:"13px", borderRadius:12, border:`1px solid ${C.border}`, background:"#fff", color:C.textM, fontSize:13, fontWeight:800, cursor:"pointer"}}>
+              Batal
+            </button>
+            <button onClick={handleDelete} style={{flex:1, padding:"13px", borderRadius:12, border:"none", background:C.red, color:"#fff", fontSize:13, fontWeight:800, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:6}}>
+              <Trash2 size={15}/> Hapus
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -1561,6 +1680,22 @@ export default function App() {
   });
   const onDelete = id => setTxs(p=>p.filter(x=>x.id!==id));
   const onDone = id => setTxs(p=>p.map(x=>x.id===id?{...x, status:"selesai"}:x));
+  const onDeletePeriod = periodToDelete => setTxs(p=>deleteTransactionsByPeriod(p, periodToDelete).next);
+  const onCopyBudget = () => {
+    const p = normalizePeriod(period);
+    if(p.mode !== "month") return;
+    const {items, sourceCount, prev} = copyBudgetFromPreviousMonth(txs, p);
+    if(sourceCount === 0) {
+      alert(`Tidak ada budget dari ${formatMonthYear(prev.month, prev.year)} untuk dicopy.`);
+      return;
+    }
+    if(items.length === 0) {
+      alert("Budget bulan lalu sudah pernah dicopy.");
+      return;
+    }
+    setTxs(prevTxs=>[...prevTxs, ...items]);
+    alert(`${items.length} item berhasil dicopy dari ${formatMonthYear(prev.month, prev.year)}.`);
+  };
   const openUpgrade = () => setSubPage("upgrade");
 
   if(!user) return <LoginScreen onLogin={setUser}/>;
@@ -1569,9 +1704,9 @@ export default function App() {
     if(subPage==="upgrade") return <UpgradeScreen setSubPage={setSubPage}/>;
     if(subPage==="transfer") return <TransferScreen txs={txs} setSubPage={setSubPage}/>;
     if(subPage==="zakat") return <ZakatScreen setSubPage={setSubPage}/>;
-    if(subPage==="tx-list") return <TxListScreen txs={periodTxs} period={period} setPeriod={setPeriod} years={periodYears} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} onDelete={onDelete} onDone={onDone}/>;
+    if(subPage==="tx-list") return <TxListScreen txs={periodTxs} allTxs={txs} period={period} setPeriod={setPeriod} years={periodYears} onCopyBudget={onCopyBudget} onDeletePeriod={onDeletePeriod} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} onDelete={onDelete} onDone={onDone}/>;
     if(subPage==="share") return <ShareScreen txs={txs} setSubPage={setSubPage}/>;
-    if(tab==="home") return <HomeScreen txs={periodTxs} period={period} setPeriod={setPeriod} years={periodYears} setTab={setTab} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} openUpgrade={openUpgrade} user={user}/>;
+    if(tab==="home") return <HomeScreen txs={periodTxs} period={period} setPeriod={setPeriod} years={periodYears} onCopyBudget={onCopyBudget} setTab={setTab} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} openUpgrade={openUpgrade} user={user}/>;
     if(tab==="reports") return <ReportsScreen txs={periodTxs} period={period} setPeriod={setPeriod} years={periodYears} openUpgrade={openUpgrade}/>;
     if(tab==="goals-tab") return <GoalsScreen goals={goals} openUpgrade={openUpgrade}/>;
     if(tab==="more") return <MoreScreen setSubPage={setSubPage} openUpgrade={openUpgrade} onLogout={()=>setUser(null)}/>;
