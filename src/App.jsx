@@ -219,14 +219,15 @@ const formatShortDate = date => {
 
 // ─── Calc helpers ───
 const calcSummary = txs => {
-  const totalIncome = txs.filter(x=>x.type==="income").reduce((s,x)=>s+x.amt,0);
+  const incomePlan = txs.filter(x=>x.type==="income"&&x.status!=="batal").reduce((s,x)=>s+x.amt,0);
+  const totalIncome = txs.filter(x=>x.type==="income"&&x.status==="selesai").reduce((s,x)=>s+x.amt,0);
   const estExp = txs.filter(x=>x.type==="expense"&&x.status!=="batal").reduce((s,x)=>s+x.amt,0);
   const paid = txs.filter(x=>x.type==="expense"&&x.status==="selesai").reduce((s,x)=>s+x.amt,0);
   const unpaid = txs.filter(x=>x.type==="expense"&&x.status==="belum_selesai").reduce((s,x)=>s+x.amt,0);
   return {
-    totalIncome, estExp, paid, unpaid,
+    totalIncome, incomePlan, estExp, paid, unpaid,
     actBal: totalIncome - paid,
-    safeBal: totalIncome - estExp,
+    safeBal: incomePlan - estExp,
     prog: estExp>0 ? Math.round(paid/estExp*100) : 0,
   };
 };
@@ -249,7 +250,7 @@ const calcWeekData = txs => {
     const day = Number((tx.date || "").slice(8, 10));
     if(!day) return;
     const idx = Math.min(Math.floor((day - 1) / 7), 4);
-    if(tx.type==="income") weeks[idx].in += tx.amt;
+    if(tx.type==="income"&&tx.status==="selesai") weeks[idx].in += tx.amt;
     if(tx.type==="expense"&&tx.status==="selesai") weeks[idx].out += tx.amt;
   });
   return weeks;
@@ -993,6 +994,9 @@ const TxListScreen = ({txs, allTxs, period, setPeriod, years, onCopyBudget, onDe
                     {tx.type==="income"?"+":"-"}{fmtS(tx.amt)}
                   </p>
                   <div style={{display:"flex", gap:4, justifyContent:"flex-end", flexWrap:"wrap"}}>
+                    {tx.type==="income" && tx.status==="estimasi" && (
+                      <button onClick={()=>onDone(tx.id)} style={{background:C.priL, color:C.priD, border:"none", borderRadius:7, padding:"4px 6px", fontSize:10, fontWeight:800, cursor:"pointer"}}>Diterima</button>
+                    )}
                     {tx.status==="belum_selesai" && (
                       <button onClick={()=>onDone(tx.id)} style={{background:C.priL, color:C.priD, border:"none", borderRadius:7, padding:"4px 6px", fontSize:10, fontWeight:800, cursor:"pointer"}}>Lunas</button>
                     )}
@@ -1257,6 +1261,7 @@ const AddSheet = ({editTx, onSave, onClose}) => {
   const [f, setF] = useState(editTx || {date:new Date().toISOString().slice(0,10), type:"expense", grp:"bunda", cat:"", desc:"", amt:"", status:"estimasi", pay:"transfer", acc:"BSI"});
   const [err, setErr] = useState({});
   const s = (k,v) => setF(p=>({...p, [k]:v}));
+  const statusOptions = Object.entries(STATUS).filter(([v])=>f.type==="income" ? ["estimasi","selesai","batal"].includes(v) : true);
 
   const save = () => {
     const e = {};
@@ -1323,18 +1328,16 @@ const AddSheet = ({editTx, onSave, onClose}) => {
             {Number(f.amt)>0 && <p style={{color:C.pri, fontSize:12, margin:"4px 0 0", fontWeight:700}}>{fmt(Number(f.amt))}</p>}
           </div>
 
-          {f.type==="expense" && (
-            <div>
-              <label style={lbl}>Status</label>
-              <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:8}}>
-                {Object.entries(STATUS).map(([v,st])=>(
-                  <button key={v} onClick={()=>s("status",v)} style={{padding:"10px", borderRadius:10, border:`1.5px solid ${f.status===v?st.color:C.border}`, background:f.status===v?st.bg:"#fff", color:f.status===v?st.color:C.textM, fontSize:12, fontWeight:700, cursor:"pointer"}}>
-                    {st.label}
-                  </button>
-                ))}
-              </div>
+          <div>
+            <label style={lbl}>Status</label>
+            <div style={{display:"grid", gridTemplateColumns:f.type==="income"?"repeat(3, 1fr)":"1fr 1fr", gap:8}}>
+              {statusOptions.map(([v,st])=>(
+                <button key={v} onClick={()=>s("status",v)} style={{padding:"10px", borderRadius:10, border:`1.5px solid ${f.status===v?st.color:C.border}`, background:f.status===v?st.bg:"#fff", color:f.status===v?st.color:C.textM, fontSize:12, fontWeight:700, cursor:"pointer"}}>
+                  {st.label}
+                </button>
+              ))}
             </div>
-          )}
+          </div>
 
           <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:10}}>
             <div>
