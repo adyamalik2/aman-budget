@@ -26,6 +26,10 @@ import {
   normalizePeriod,
 } from "./utils/period";
 
+// ─── GOAL DEFAULTS ───
+const GOAL_COLORS = ["#16a34a","#2563eb","#d97706","#dc2626","#7c3aed","#0891b2"];
+const GOAL_ICONS  = ["plane","grad","shield"];
+
 // ─── APP ───
 export default function App() {
   const [user, setUser] = useState(() => loadStored(STORAGE_KEYS.user, null, v=>v === null || typeof v === "object"));
@@ -60,6 +64,18 @@ export default function App() {
     const value = Number(amount);
     if(!goal?.id || !Number.isFinite(value) || value <= 0) return;
     setGoals(p=>p.map(g=>g.id===goal.id ? {...g, saved:Number(g.saved||0)+value} : g));
+  };
+  const onAddGoal = ({name, target}) => {
+    setGoals(p => {
+      const idx = p.length;
+      return [...p, {id:Date.now().toString(), name:name.trim(), target:Number(target), saved:0, deadline:"", icon:GOAL_ICONS[idx%GOAL_ICONS.length], color:GOAL_COLORS[idx%GOAL_COLORS.length]}];
+    });
+  };
+  const onEditGoal = (id, {name, target}) => {
+    setGoals(p=>p.map(g=>g.id===id ? {...g, name:name.trim(), target:Number(target)} : g));
+  };
+  const onDeleteGoal = id => {
+    setGoals(p=>p.filter(g=>g.id!==id));
   };
   const onCopyBudget = () => {
     const p = normalizePeriod(period);
@@ -138,7 +154,7 @@ export default function App() {
     if(subPage==="share") return <ShareScreen txs={txs} setSubPage={setSubPage}/>;
     if(tab==="home") return <HomeScreen txs={periodTxs} period={period} setPeriod={setPeriod} years={periodYears} onCopyBudget={onCopyBudget} setTab={setTab} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} openUpgrade={openUpgrade} user={user}/>;
     if(tab==="reports") return <ReportsScreen txs={periodTxs} period={period} setPeriod={setPeriod} years={periodYears} openUpgrade={openUpgrade}/>;
-    if(tab==="goals-tab") return <GoalsScreen goals={goals} txs={txs} openUpgrade={openUpgrade} onAddSaving={onAddGoalSaving}/>;
+    if(tab==="goals-tab") return <GoalsScreen goals={goals} txs={txs} openUpgrade={openUpgrade} onAddSaving={onAddGoalSaving} onAddGoal={onAddGoal} onEditGoal={onEditGoal} onDeleteGoal={onDeleteGoal}/>;
     if(tab==="more") return <MoreScreen setSubPage={setSubPage} openUpgrade={openUpgrade} onLogout={()=>setUser(null)} onExportBackup={onExportBackup} onImportBackup={onImportBackup}/>;
     return null;
   };
