@@ -5,7 +5,7 @@ import {
   Users, ArrowRightLeft, Plane, GraduationCap, Shield,
   ChevronRight, ChevronLeft, Mail, Lock, Send, Calculator, LayoutGrid,
   Star, Zap, LogOut, CreditCard, Receipt, PiggyBank, Check,
-  TrendingUp, TrendingDown, Filter, FileDown, Copy
+  TrendingUp, TrendingDown, Filter, FileDown, Copy, Upload
 } from "lucide-react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 
@@ -104,6 +104,34 @@ const removeStored = key => {
   } catch {
     // Keep logout usable even when browser storage is unavailable.
   }
+};
+
+const isRecord = value => value !== null && typeof value === "object" && !Array.isArray(value);
+
+const formatBackupDate = date => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+
+const isJsonFile = file => Boolean(file?.name?.toLowerCase().endsWith(".json"));
+
+const isValidBackupTx = tx => (
+  isRecord(tx) &&
+  typeof tx.id === "string" &&
+  typeof tx.date === "string" &&
+  (tx.type === "income" || tx.type === "expense") &&
+  Number.isFinite(Number(tx.amt))
+);
+
+const isValidBackupData = data => {
+  if(!isRecord(data)||!Array.isArray(data.transactions)) return false;
+  if(!data.transactions.every(isValidBackupTx)) return false;
+  if(data.goals !== undefined && (!Array.isArray(data.goals)||!data.goals.every(isRecord))) return false;
+  if(data.user !== undefined && data.user !== null && !isRecord(data.user)) return false;
+  if(data.period !== undefined && !isRecord(data.period)) return false;
+  return true;
 };
 
 const getDefaultPeriod = () => {
@@ -1097,7 +1125,7 @@ const DeletePeriodSheet = ({txs, initialPeriod, onDelete, onClose}) => {
 };
 
 // ─── MORE ───
-const MoreScreen = ({setSubPage, openUpgrade, onLogout}) => {
+const MoreScreen = ({setSubPage, openUpgrade, onLogout, onExportBackup, onImportBackup}) => {
   const items = [
     {icon:ArrowRightLeft, label:"Transfer Planner", desc:"Alokasi per anggota keluarga", action:()=>setSubPage("transfer"), color:C.blue},
     {icon:Calculator, label:"Kalkulator Zakat", desc:"Hitung zakat penghasilan 2.5%", action:()=>setSubPage("zakat"), color:C.pri},
@@ -1106,6 +1134,27 @@ const MoreScreen = ({setSubPage, openUpgrade, onLogout}) => {
     {icon:FileDown, label:"Export Laporan", desc:"PDF & Excel untuk arsip", pro:true, color:"#8b5cf6"},
     {icon:Receipt, label:"OCR Struk", desc:"Scan struk otomatis", pro:true, color:"#06b6d4"},
   ];
+  const backupBtnStyle = {
+    flex:1,
+    padding:"12px",
+    borderRadius:12,
+    border:`1.5px solid ${C.border}`,
+    background:"#fff",
+    color:C.text,
+    fontSize:12,
+    fontWeight:800,
+    cursor:"pointer",
+    display:"flex",
+    alignItems:"center",
+    justifyContent:"center",
+    gap:7,
+    boxSizing:"border-box",
+  };
+  const handleImportFile = e => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if(file) onImportBackup(file);
+  };
 
   return (
     <div style={{flex:1, overflowY:"auto", paddingBottom:92, background:C.bg}}>
@@ -1156,6 +1205,28 @@ const MoreScreen = ({setSubPage, openUpgrade, onLogout}) => {
               <ChevronRight size={16} color={C.textL}/>
             </button>
           ))}
+        </div>
+
+        {/* Backup data */}
+        <div style={card}>
+          <div style={{display:"flex", alignItems:"flex-start", gap:10, marginBottom:12}}>
+            <div style={{width:38, height:38, borderRadius:11, background:C.priL, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0}}>
+              <FileDown size={18} color={C.pri}/>
+            </div>
+            <div style={{flex:1}}>
+              <p style={{fontSize:13, fontWeight:800, color:C.text, margin:0}}>Backup Data</p>
+              <p style={{fontSize:11, color:C.textM, margin:"2px 0 0", lineHeight:1.4}}>Simpan atau pulihkan transaksi, goals, akun, dan periode.</p>
+            </div>
+          </div>
+          <div style={{display:"flex", gap:8, flexWrap:"wrap"}}>
+            <button onClick={onExportBackup} style={{...backupBtnStyle, color:C.pri, borderColor:C.pri}}>
+              <FileDown size={15}/> Export Backup
+            </button>
+            <label style={backupBtnStyle}>
+              <Upload size={15}/> Import Backup
+              <input type="file" accept="application/json,.json" onChange={handleImportFile} style={{display:"none"}}/>
+            </label>
+          </div>
         </div>
 
         {/* Settings */}
@@ -1689,7 +1760,7 @@ export default function App() {
   const [addOpen, setAddOpen] = useState(false);
   const [editTx, setEditTx] = useState(null);
   const [txs, setTxs] = useState(() => loadStored(STORAGE_KEYS.txs, INIT_TX, Array.isArray));
-  const [goals] = useState(() => loadStored(STORAGE_KEYS.goals, INIT_GOALS, Array.isArray));
+  const [goals, setGoals] = useState(() => loadStored(STORAGE_KEYS.goals, INIT_GOALS, Array.isArray));
   const [period, setPeriod] = useState(() => normalizePeriod(loadStored(STORAGE_KEYS.period, getDefaultPeriod(), v=>v&&typeof v==="object"&&!Array.isArray(v))));
 
   useEffect(()=>{ saveStored(STORAGE_KEYS.txs, txs); }, [txs]);
@@ -1726,6 +1797,56 @@ export default function App() {
     setTxs(prevTxs=>[...prevTxs, ...items]);
     alert(`${items.length} item berhasil dicopy dari ${formatMonthYear(prev.month, prev.year)}.`);
   };
+  const onExportBackup = () => {
+    try {
+      const backup = {
+        app:"AMAN Budget",
+        version:1,
+        exportedAt:new Date().toISOString(),
+        transactions:txs,
+        goals,
+        user,
+        period:normalizePeriod(period),
+      };
+      const blob = new Blob([JSON.stringify(backup, null, 2)], {type:"application/json"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `aman-budget-backup-${formatBackupDate(new Date())}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      alert("Gagal membuat file backup.");
+    }
+  };
+  const onImportBackup = async file => {
+    if(!isJsonFile(file)) {
+      alert("File backup harus berformat JSON.");
+      return;
+    }
+
+    try {
+      const raw = await file.text();
+      const data = JSON.parse(raw);
+      if(!isValidBackupData(data)) {
+        alert("File backup tidak valid.");
+        return;
+      }
+
+      const ok = window.confirm(`Import backup akan mengganti ${txs.length} transaksi saat ini dengan ${data.transactions.length} transaksi dari file. Lanjutkan?`);
+      if(!ok) return;
+
+      setTxs(data.transactions.map(tx=>({...tx, amt:Number(tx.amt)})));
+      if(data.goals !== undefined) setGoals(data.goals);
+      if(Object.prototype.hasOwnProperty.call(data, "user")) setUser(data.user);
+      if(data.period !== undefined) setPeriod(normalizePeriod(data.period));
+      alert("Backup berhasil diimport.");
+    } catch {
+      alert("Gagal membaca file backup. Pastikan file JSON tidak rusak.");
+    }
+  };
   const openUpgrade = () => setSubPage("upgrade");
 
   if(!user) return <LoginScreen onLogin={setUser}/>;
@@ -1739,7 +1860,7 @@ export default function App() {
     if(tab==="home") return <HomeScreen txs={periodTxs} period={period} setPeriod={setPeriod} years={periodYears} onCopyBudget={onCopyBudget} setTab={setTab} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} openUpgrade={openUpgrade} user={user}/>;
     if(tab==="reports") return <ReportsScreen txs={periodTxs} period={period} setPeriod={setPeriod} years={periodYears} openUpgrade={openUpgrade}/>;
     if(tab==="goals-tab") return <GoalsScreen goals={goals} openUpgrade={openUpgrade}/>;
-    if(tab==="more") return <MoreScreen setSubPage={setSubPage} openUpgrade={openUpgrade} onLogout={()=>setUser(null)}/>;
+    if(tab==="more") return <MoreScreen setSubPage={setSubPage} openUpgrade={openUpgrade} onLogout={()=>setUser(null)} onExportBackup={onExportBackup} onImportBackup={onImportBackup}/>;
     return null;
   };
 
