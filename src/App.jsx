@@ -56,6 +56,11 @@ export default function App() {
   const onDelete = id => setTxs(p=>p.filter(x=>x.id!==id));
   const onDone = id => setTxs(p=>p.map(x=>x.id===id?{...x, status:"selesai"}:x));
   const onDeletePeriod = periodToDelete => setTxs(p=>deleteTransactionsByPeriod(p, periodToDelete).next);
+  const onAddGoalSaving = (goal, amount) => {
+    const value = Number(amount);
+    if(!goal?.id || !Number.isFinite(value) || value <= 0) return;
+    setGoals(p=>p.map(g=>g.id===goal.id ? {...g, saved:Number(g.saved||0)+value} : g));
+  };
   const onCopyBudget = () => {
     const p = normalizePeriod(period);
     if(p.mode !== "month") return;
@@ -133,7 +138,7 @@ export default function App() {
     if(subPage==="share") return <ShareScreen txs={txs} setSubPage={setSubPage}/>;
     if(tab==="home") return <HomeScreen txs={periodTxs} period={period} setPeriod={setPeriod} years={periodYears} onCopyBudget={onCopyBudget} setTab={setTab} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} openUpgrade={openUpgrade} user={user}/>;
     if(tab==="reports") return <ReportsScreen txs={periodTxs} period={period} setPeriod={setPeriod} years={periodYears} openUpgrade={openUpgrade}/>;
-    if(tab==="goals-tab") return <GoalsScreen goals={goals} openUpgrade={openUpgrade}/>;
+    if(tab==="goals-tab") return <GoalsScreen goals={goals} openUpgrade={openUpgrade} onAddSaving={onAddGoalSaving}/>;
     if(tab==="more") return <MoreScreen setSubPage={setSubPage} openUpgrade={openUpgrade} onLogout={()=>setUser(null)} onExportBackup={onExportBackup} onImportBackup={onImportBackup}/>;
     return null;
   };
