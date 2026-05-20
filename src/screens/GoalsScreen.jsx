@@ -12,6 +12,7 @@ const lbl = {fontSize:12, fontWeight:700, color:C.textM, display:"block", margin
 
 const ICON_MAP = {plane:Plane, grad:GraduationCap, shield:Shield};
 const EMPTY_GFORM = {name:"", target:""};
+const FREE_GOAL_LIMIT = 3;
 
 const GoalsScreen = ({goals, txs = [], openUpgrade, onAddSaving, onAddGoal, onEditGoal, onDeleteGoal}) => {
   // Tambah Tabungan modal state
@@ -155,12 +156,26 @@ const GoalsScreen = ({goals, txs = [], openUpgrade, onAddSaving, onAddGoal, onEd
           );
         })}
 
-        {/* Tambah Goal button */}
-        <button type="button" onClick={openAddGoal}
-          style={{...card, border:`2px dashed ${C.pri}66`, background:C.priBg, display:"flex", alignItems:"center", justifyContent:"center", gap:8, cursor:"pointer", padding:"14px 16px"}}>
-          <Plus size={18} color={C.pri}/>
-          <span style={{fontSize:13, fontWeight:700, color:C.pri}}>Tambah Goal Baru</span>
-        </button>
+        {/* Tambah Goal button — terkunci jika sudah di limit Free */}
+        {(() => {
+          const atLimit = goals.length >= FREE_GOAL_LIMIT;
+          return (
+            <div style={{display:"flex", flexDirection:"column", gap:4}}>
+              <button type="button" onClick={atLimit ? openUpgrade : openAddGoal}
+                style={{...card, border:`2px dashed ${atLimit ? C.gold : C.pri}66`, background: atLimit ? C.goldL+"40" : C.priBg, display:"flex", alignItems:"center", justifyContent:"center", gap:8, cursor:"pointer", padding:"14px 16px"}}>
+                <Plus size={18} color={atLimit ? C.gold : C.pri}/>
+                <span style={{fontSize:13, fontWeight:700, color: atLimit ? C.gold : C.pri}}>
+                  {atLimit ? "Tambah Goal Baru (Pro)" : "Tambah Goal Baru"}
+                </span>
+              </button>
+              {atLimit && (
+                <p style={{fontSize:11, color:C.textM, margin:0, textAlign:"center"}}>
+                  Free maksimal 3 goals · Upgrade ke Pro untuk unlimited
+                </p>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Upgrade prompt */}
         <button type="button" onClick={openUpgrade}
