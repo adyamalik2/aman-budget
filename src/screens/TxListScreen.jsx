@@ -9,7 +9,7 @@ import { C } from "../constants/theme";
 import { fmtS } from "../utils/format";
 import { formatPeriodLabel, formatShortDate } from "../utils/period";
 
-const TxListScreen = ({txs, allTxs, period, setPeriod, years, onCopyBudget, onDeletePeriod, setSubPage, setEditTx, setAddOpen, onDelete, onDone}) => {
+const TxListScreen = ({txs, allTxs, goals = [], period, setPeriod, years, onCopyBudget, onDeletePeriod, setSubPage, setEditTx, setAddOpen, onDelete, onDone}) => {
   const [fS, setFS] = useState("all");
   const [fG] = useState("all");
   const [q, setQ] = useState("");
@@ -62,7 +62,9 @@ const TxListScreen = ({txs, allTxs, period, setPeriod, years, onCopyBudget, onDe
         {filtered.length===0 && <p style={{textAlign:"center", color:C.textL, fontSize:13, padding:"3rem 0"}}>Tidak ada transaksi</p>}
         {filtered.length > 0 && (
           <div style={{background:"#fff", border:`1px solid ${C.borderL}`, borderRadius:12, overflow:"hidden"}}>
-            {filtered.map((tx,i)=>(
+            {filtered.map((tx,i)=>{
+              const goalName = tx.goalId ? (goals.find(g=>g.id===tx.goalId)?.name ?? null) : null;
+              return (
               <div key={tx.id} style={{display:"grid", gridTemplateColumns:"42px minmax(0, 1fr) auto", gap:9, alignItems:"center", padding:"9px 10px", borderBottom:i<filtered.length-1?`1px solid ${C.borderL}`:"none", background:"#fff"}}>
                 <div style={{fontSize:11, fontWeight:800, color:C.textM, lineHeight:1.2, textAlign:"center"}}>{formatShortDate(tx.date)}</div>
                 <div style={{minWidth:0}}>
@@ -72,6 +74,11 @@ const TxListScreen = ({txs, allTxs, period, setPeriod, years, onCopyBudget, onDe
                       {tx.type==="income"?"Pemasukan":`${tx.cat || "Pengeluaran"} · ${GROUPS[tx.grp]?.label || "Lain-lain"}`} · {tx.pay}
                     </span>
                     <Badge bg={STATUS[tx.status]?.bg} color={STATUS[tx.status]?.color}>{STATUS[tx.status]?.label}</Badge>
+                    {goalName && (
+                      <span style={{fontSize:10, color:C.priD, background:C.priL, borderRadius:5, padding:"1px 6px", fontWeight:700}}>
+                        Goal: {goalName}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div style={{display:"flex", flexDirection:"column", alignItems:"flex-end", gap:5}}>
@@ -92,7 +99,8 @@ const TxListScreen = ({txs, allTxs, period, setPeriod, years, onCopyBudget, onDe
                   </div>
                 </div>
               </div>
-            ))}
+            );
+            })}
           </div>
         )}
       </div>

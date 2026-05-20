@@ -150,7 +150,7 @@ export default function App() {
     if(subPage==="upgrade") return <UpgradeScreen setSubPage={setSubPage}/>;
     if(subPage==="transfer") return <TransferScreen txs={txs} setSubPage={setSubPage}/>;
     if(subPage==="zakat") return <ZakatScreen setSubPage={setSubPage}/>;
-    if(subPage==="tx-list") return <TxListScreen txs={periodTxs} allTxs={txs} period={period} setPeriod={setPeriod} years={periodYears} onCopyBudget={onCopyBudget} onDeletePeriod={onDeletePeriod} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} onDelete={onDelete} onDone={onDone}/>;
+    if(subPage==="tx-list") return <TxListScreen txs={periodTxs} allTxs={txs} goals={goals} period={period} setPeriod={setPeriod} years={periodYears} onCopyBudget={onCopyBudget} onDeletePeriod={onDeletePeriod} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} onDelete={onDelete} onDone={onDone}/>;
     if(subPage==="share") return <ShareScreen txs={txs} setSubPage={setSubPage}/>;
     if(tab==="home") return <HomeScreen txs={periodTxs} period={period} setPeriod={setPeriod} years={periodYears} onCopyBudget={onCopyBudget} setTab={setTab} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} openUpgrade={openUpgrade} user={user}/>;
     if(tab==="reports") return <ReportsScreen txs={periodTxs} period={period} setPeriod={setPeriod} years={periodYears} openUpgrade={openUpgrade}/>;
