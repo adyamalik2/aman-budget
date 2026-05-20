@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Home, BarChart3, Target, Plus, Search, X, Edit2, Trash2,
   Bell, Crown, Sparkles, CheckCircle2, Clock,
@@ -67,6 +67,39 @@ const INIT_GOALS = [
   {id:"g2", name:"Dana Pendidikan Anak", target:50000000, saved:18500000, deadline:"Jun 2030", icon:"grad", color:"#2563eb"},
   {id:"g3", name:"Dana Darurat", target:30000000, saved:22000000, deadline:"Des 2026", icon:"shield", color:"#d97706"},
 ];
+
+const STORAGE_KEYS = {
+  txs: "amanBudget.transactions",
+  goals: "amanBudget.goals",
+  user: "amanBudget.user",
+};
+
+const loadStored = (key, fallback, validate = () => true) => {
+  try {
+    const raw = window.localStorage.getItem(key);
+    if(!raw) return fallback;
+    const value = JSON.parse(raw);
+    return validate(value) ? value : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const saveStored = (key, value) => {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Keep the app usable even when browser storage is unavailable.
+  }
+};
+
+const removeStored = key => {
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // Keep logout usable even when browser storage is unavailable.
+  }
+};
 
 // ─── Calc helpers ───
 const calcSummary = txs => {
@@ -1337,13 +1370,20 @@ const BottomNav = ({tab, setTab, setAddOpen, setEditTx}) => {
 
 // ─── APP ───
 export default function App() {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => loadStored(STORAGE_KEYS.user, null, v=>v === null || typeof v === "object"));
   const [tab, setTab] = useState("home");
   const [subPage, setSubPage] = useState(null);
   const [addOpen, setAddOpen] = useState(false);
   const [editTx, setEditTx] = useState(null);
-  const [txs, setTxs] = useState(INIT_TX);
-  const [goals] = useState(INIT_GOALS);
+  const [txs, setTxs] = useState(() => loadStored(STORAGE_KEYS.txs, INIT_TX, Array.isArray));
+  const [goals] = useState(() => loadStored(STORAGE_KEYS.goals, INIT_GOALS, Array.isArray));
+
+  useEffect(()=>{ saveStored(STORAGE_KEYS.txs, txs); }, [txs]);
+  useEffect(()=>{ saveStored(STORAGE_KEYS.goals, goals); }, [goals]);
+  useEffect(()=>{
+    if(user) saveStored(STORAGE_KEYS.user, user);
+    else removeStored(STORAGE_KEYS.user);
+  }, [user]);
 
   const onSave = tx => setTxs(p=>{
     const i = p.findIndex(x=>x.id===tx.id);
