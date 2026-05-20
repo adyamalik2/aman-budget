@@ -1,10 +1,10 @@
 import { useState, useMemo, useEffect } from "react";
 import {
-  Plus, Search, X, Trash2,
-  Bell, Crown, Sparkles, CheckCircle2, Clock,
-  Users, ArrowRightLeft, Plane, GraduationCap, Shield,
+  Search, X, Trash2,
+  Bell, Crown, Sparkles, Clock,
+  Users, ArrowRightLeft, Shield,
   ChevronRight, ChevronLeft, Mail, Lock, Send, Calculator, LayoutGrid,
-  Star, Zap, LogOut, CreditCard, Receipt, PiggyBank, Check,
+  Star, LogOut, CreditCard, Receipt, PiggyBank, Check,
   TrendingUp, TrendingDown, Filter, FileDown, Copy, Upload
 } from "lucide-react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
@@ -14,6 +14,10 @@ import Badge from "./components/ui/Badge";
 import Header from "./components/layout/Header";
 import BottomNav from "./components/layout/BottomNav";
 import PeriodPicker from "./components/period/PeriodPicker";
+import GoalsScreen from "./screens/GoalsScreen";
+import TransferScreen from "./screens/TransferScreen";
+import ZakatScreen from "./screens/ZakatScreen";
+import UpgradeScreen from "./screens/UpgradeScreen";
 import { C } from "./constants/theme";
 import { GROUPS, STATUS, STORAGE_KEYS } from "./constants/app";
 import { INIT_GOALS, INIT_TX } from "./data/initialData";
@@ -387,188 +391,6 @@ const ReportsScreen = ({txs, period, setPeriod, years, openUpgrade}) => {
   );
 };
 
-// ─── GOALS ───
-const GoalsScreen = ({goals, openUpgrade}) => {
-  const totalTarget = goals.reduce((s,g)=>s+g.target, 0);
-  const totalSaved = goals.reduce((s,g)=>s+g.saved, 0);
-
-  const iconMap = {plane:Plane, grad:GraduationCap, shield:Shield};
-
-  return (
-    <div style={{flex:1, overflowY:"auto", paddingBottom:92, background:C.bg}}>
-      <Header title="Goals" subtitle="Target tabungan keluarga"/>
-
-      <div style={{padding:"14px", display:"flex", flexDirection:"column", gap:12}}>
-        {/* Summary */}
-        <div style={{background:`linear-gradient(135deg, ${C.pri}, ${C.priD})`, borderRadius:18, padding:"16px", color:"#fff"}}>
-          <p style={{fontSize:11, margin:0, opacity:0.85, fontWeight:600, letterSpacing:0.3}}>TOTAL TERKUMPUL</p>
-          <p style={{fontSize:26, fontWeight:800, margin:"4px 0 8px", letterSpacing:-0.5}}>{fmt(totalSaved)}</p>
-          <div style={{background:"rgba(255,255,255,0.2)", borderRadius:8, height:8, overflow:"hidden"}}>
-            <div style={{background:"#fff", height:"100%", width:`${totalSaved/totalTarget*100}%`}}/>
-          </div>
-          <p style={{fontSize:11, margin:"6px 0 0", opacity:0.85}}>{Math.round(totalSaved/totalTarget*100)}% dari target {fmt(totalTarget)}</p>
-        </div>
-
-        {/* Goals list */}
-        {goals.map(g=>{
-          const pct = Math.round(g.saved/g.target*100);
-          const Icon = iconMap[g.icon];
-          return (
-            <div key={g.id} style={{...card, padding:0, overflow:"hidden"}}>
-              <div style={{padding:"14px 16px"}}>
-                <div style={{display:"flex", alignItems:"center", gap:12, marginBottom:10}}>
-                  <div style={{width:44, height:44, background:g.color+"15", borderRadius:12, display:"flex", alignItems:"center", justifyContent:"center"}}>
-                    <Icon size={22} color={g.color}/>
-                  </div>
-                  <div style={{flex:1}}>
-                    <p style={{fontSize:14, fontWeight:700, color:C.text, margin:0}}>{g.name}</p>
-                    <p style={{fontSize:11, color:C.textM, margin:0}}>Target: {g.deadline}</p>
-                  </div>
-                  <span style={{fontSize:16, fontWeight:800, color:g.color}}>{pct}%</span>
-                </div>
-                <div style={{background:C.borderL, borderRadius:8, height:8, overflow:"hidden", marginBottom:8}}>
-                  <div style={{background:g.color, height:"100%", width:`${pct}%`, transition:"width .5s"}}/>
-                </div>
-                <div style={{display:"flex", justifyContent:"space-between", fontSize:11}}>
-                  <span style={{color:C.textM}}>Terkumpul: <b style={{color:C.text}}>{fmtS(g.saved)}</b></span>
-                  <span style={{color:C.textM}}>Sisa: <b style={{color:C.text}}>{fmtS(g.target-g.saved)}</b></span>
-                </div>
-              </div>
-              <button style={{width:"100%", padding:"10px", background:g.color+"10", border:"none", color:g.color, fontSize:12, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:5}}>
-                <Plus size={14}/> Tambah Tabungan
-              </button>
-            </div>
-          );
-        })}
-
-        {/* Upgrade prompt */}
-        <button onClick={openUpgrade} style={{...card, border:`2px dashed ${C.gold}66`, background:C.goldL+"40", display:"flex", alignItems:"center", gap:10, cursor:"pointer", textAlign:"left"}}>
-          <Crown size={22} color={C.gold}/>
-          <div style={{flex:1}}>
-            <p style={{fontSize:13, fontWeight:700, color:C.text, margin:0}}>Tambah Goals Tanpa Batas</p>
-            <p style={{fontSize:11, color:C.textM, margin:0}}>Free hanya 3 goals · Upgrade ke Pro untuk unlimited</p>
-          </div>
-          <ChevronRight size={16} color={C.gold}/>
-        </button>
-      </div>
-    </div>
-  );
-};
-
-// ─── TRANSFER PLANNER ───
-const TransferScreen = ({txs, setSubPage}) => {
-  const grps = calcGroups(txs);
-  const total = Object.values(grps).reduce((s,v)=>s+v.budget, 0);
-  const paidTotal = Object.values(grps).reduce((s,v)=>s+v.paid, 0);
-
-  return (
-    <div style={{flex:1, overflowY:"auto", paddingBottom:92, background:C.bg}}>
-      <Header title="Transfer Planner" subtitle="Alokasi per anggota keluarga" onBack={()=>setSubPage(null)}/>
-
-      <div style={{padding:"14px", display:"flex", flexDirection:"column", gap:12}}>
-        <div style={{background:`linear-gradient(135deg, ${C.blue}, #1d4ed8)`, borderRadius:18, padding:"16px", color:"#fff"}}>
-          <p style={{fontSize:11, margin:0, opacity:0.85, fontWeight:600, letterSpacing:0.3}}>TOTAL TRANSFER BULAN INI</p>
-          <p style={{fontSize:26, fontWeight:800, margin:"4px 0 4px", letterSpacing:-0.5}}>{fmt(total)}</p>
-          <div style={{display:"flex", gap:14, fontSize:11, opacity:0.9, marginTop:8}}>
-            <span><Check size={11} style={{display:"inline", verticalAlign:-1}}/> Terkirim: <b>{fmtS(paidTotal)}</b></span>
-            <span><Clock size={11} style={{display:"inline", verticalAlign:-1}}/> Sisa: <b>{fmtS(total-paidTotal)}</b></span>
-          </div>
-        </div>
-
-        {Object.entries(grps).map(([g,v])=>{
-          const pct = v.budget>0 ? Math.round(v.paid/v.budget*100) : 0;
-          return (
-            <div key={g} style={card}>
-              <div style={{display:"flex", alignItems:"center", gap:12, marginBottom:10}}>
-                <div style={{width:42, height:42, background:GROUPS[g]?.color+"15", borderRadius:12, display:"flex", alignItems:"center", justifyContent:"center"}}>
-                  <Users size={20} color={GROUPS[g]?.color}/>
-                </div>
-                <div style={{flex:1}}>
-                  <p style={{fontSize:14, fontWeight:700, color:C.text, margin:0}}>{GROUPS[g]?.label}</p>
-                  <p style={{fontSize:11, color:C.textM, margin:0}}>{fmtS(v.paid)} dari {fmtS(v.budget)}</p>
-                </div>
-                {v.unpaid > 0 ? (
-                  <button style={{background:GROUPS[g]?.color, border:"none", borderRadius:10, padding:"7px 12px", color:"#fff", fontSize:11, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", gap:4}}>
-                    <Send size={11}/> Transfer
-                  </button>
-                ) : (
-                  <Badge bg={C.priL} color={C.priD}>LUNAS</Badge>
-                )}
-              </div>
-              <div style={{background:C.borderL, borderRadius:6, height:6, overflow:"hidden", marginBottom:8}}>
-                <div style={{background:GROUPS[g]?.color, height:"100%", width:`${pct}%`}}/>
-              </div>
-              <div style={{display:"flex", justifyContent:"space-between", fontSize:11}}>
-                <span style={{color:C.textM}}>Sudah: <b style={{color:C.pri}}>{fmtS(v.paid)}</b></span>
-                {v.unpaid > 0 && <span style={{color:C.textM}}>Belum: <b style={{color:C.red}}>{fmtS(v.unpaid)}</b></span>}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
-
-// ─── ZAKAT CALCULATOR ───
-const ZakatScreen = ({setSubPage}) => {
-  const [income, setIncome] = useState("18500000");
-  const num = Number(income) || 0;
-  const zakat = num * 0.025;
-  const nisab = 7500000; // approx
-  const wajib = num >= nisab;
-
-  return (
-    <div style={{flex:1, overflowY:"auto", paddingBottom:92, background:C.bg}}>
-      <Header title="Kalkulator Zakat" subtitle="Zakat penghasilan 2.5%" onBack={()=>setSubPage(null)}/>
-
-      <div style={{padding:"14px", display:"flex", flexDirection:"column", gap:14}}>
-        <div style={card}>
-          <label style={lbl}>Penghasilan Bulanan (Rp)</label>
-          <input type="number" style={{...inp, fontSize:18, fontWeight:700, color:C.pri}} value={income} onChange={e=>setIncome(e.target.value)}/>
-          <p style={{fontSize:11, color:C.textM, margin:"6px 0 0"}}>Gaji pokok + tunjangan + bonus + pemasukan lain</p>
-        </div>
-
-        <div style={{background:`linear-gradient(135deg, ${C.pri}, ${C.priD})`, borderRadius:18, padding:"20px 16px", color:"#fff", textAlign:"center"}}>
-          <p style={{fontSize:11, margin:0, opacity:0.85, fontWeight:600, letterSpacing:0.3}}>ZAKAT YANG WAJIB DIKELUARKAN</p>
-          <p style={{fontSize:32, fontWeight:800, margin:"6px 0", letterSpacing:-0.8}}>{fmt(zakat)}</p>
-          {wajib ? (
-            <div style={{display:"inline-flex", alignItems:"center", gap:6, background:"rgba(255,255,255,0.2)", borderRadius:20, padding:"4px 12px", fontSize:11, fontWeight:700}}>
-              <CheckCircle2 size={13}/> Sudah mencapai nisab
-            </div>
-          ) : (
-            <div style={{display:"inline-flex", alignItems:"center", gap:6, background:"rgba(255,255,255,0.2)", borderRadius:20, padding:"4px 12px", fontSize:11, fontWeight:700}}>
-              Di bawah nisab
-            </div>
-          )}
-        </div>
-
-        <div style={card}>
-          <p style={{fontSize:13, fontWeight:700, color:C.text, margin:"0 0 10px"}}>Detail Perhitungan</p>
-          {[
-            ["Penghasilan", fmt(num)],
-            ["Nisab (setara 85gr emas)", fmt(nisab)],
-            ["Tarif zakat", "2.5%"],
-            ["Total zakat per bulan", fmt(zakat), C.pri, true],
-            ["Total zakat per tahun", fmt(zakat*12), C.gold, true],
-          ].map(([k,v,c,b],i)=>(
-            <div key={i} style={{display:"flex", justifyContent:"space-between", padding:"8px 0", borderTop: i>0?`1px solid ${C.borderL}`:"none"}}>
-              <span style={{fontSize:12, color:C.textM}}>{k}</span>
-              <span style={{fontSize:13, fontWeight:b?800:600, color:c||C.text}}>{v}</span>
-            </div>
-          ))}
-        </div>
-
-        <Btn primary>
-          <span style={{display:"flex", alignItems:"center", justifyContent:"center", gap:6}}>
-            <Plus size={16}/> Tambahkan ke Budget Bulan Ini
-          </span>
-        </Btn>
-      </div>
-    </div>
-  );
-};
-
 // ─── TX LIST ───
 const TxListScreen = ({txs, allTxs, period, setPeriod, years, onCopyBudget, onDeletePeriod, setSubPage, setEditTx, setAddOpen, onDelete, onDone}) => {
   const [fS, setFS] = useState("all");
@@ -842,103 +664,6 @@ const MoreScreen = ({setSubPage, openUpgrade, onLogout, onExportBackup, onImport
 
         <p style={{textAlign:"center", fontSize:10, color:C.textL, marginTop:4}}>
           AMAN Budget v1.0.0 · © 2026 AMAN Digital<br/>amandigital.web.id
-        </p>
-      </div>
-    </div>
-  );
-};
-
-// ─── UPGRADE PRO ───
-const UpgradeScreen = ({setSubPage}) => {
-  const [plan, setPlan] = useState("yearly");
-  const plans = [
-    {id:"monthly", name:"Bulanan", price:29000, period:"/bln", desc:"Bayar tiap bulan"},
-    {id:"yearly", name:"Tahunan", price:199000, period:"/thn", desc:"Hemat 43% · Setara Rp 16.500/bln", popular:true},
-    {id:"lifetime", name:"Lifetime", price:499000, period:"sekali", desc:"Bayar sekali, pakai selamanya"},
-  ];
-  const features = [
-    "Budget unlimited bulan",
-    "Transaksi tanpa batas",
-    "Kategori & grup unlimited",
-    "Family Sync (suami-istri)",
-    "Transfer Planner advanced",
-    "Export PDF & Excel",
-    "Cloud backup otomatis",
-    "Reminder jatuh tempo",
-    "AI Insight bulanan",
-    "Goals unlimited",
-    "Receipt OCR",
-    "Tanpa iklan",
-  ];
-
-  return (
-    <div style={{flex:1, overflowY:"auto", paddingBottom:24, background:C.bg}}>
-      <div style={{background:`linear-gradient(160deg, ${C.gold} 0%, #b45309 100%)`, padding:"42px 16px 28px", color:"#fff", borderBottomLeftRadius:24, borderBottomRightRadius:24, position:"relative"}}>
-        <button onClick={()=>setSubPage(null)} style={{background:"rgba(255,255,255,0.2)", border:"none", borderRadius:10, padding:8, cursor:"pointer", color:"#fff", display:"flex", marginBottom:14}}>
-          <X size={18}/>
-        </button>
-        <div style={{textAlign:"center"}}>
-          <div style={{width:64, height:64, background:"rgba(255,255,255,0.2)", borderRadius:20, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 12px"}}>
-            <Crown size={32} color="#fff"/>
-          </div>
-          <p style={{fontSize:24, fontWeight:800, margin:0, letterSpacing:-0.5}}>AMAN Budget Pro</p>
-          <p style={{fontSize:13, opacity:0.9, margin:"6px 0 0"}}>Buka semua fitur premium untuk keluarga Anda</p>
-        </div>
-      </div>
-
-      <div style={{padding:"14px", display:"flex", flexDirection:"column", gap:12}}>
-        {/* Plans */}
-        {plans.map(p=>(
-          <button key={p.id} onClick={()=>setPlan(p.id)} style={{
-            background:"#fff", borderRadius:16, padding:"14px 16px",
-            border: plan===p.id ? `2px solid ${C.gold}` : `2px solid ${C.borderL}`,
-            cursor:"pointer", display:"flex", alignItems:"center", gap:12, textAlign:"left", position:"relative",
-            boxShadow: plan===p.id ? "0 4px 16px rgba(217,119,6,0.15)" : "none"
-          }}>
-            {p.popular && (
-              <span style={{position:"absolute", top:-9, right:14, background:C.gold, color:"#fff", fontSize:10, fontWeight:800, padding:"3px 8px", borderRadius:6, letterSpacing:0.3}}>
-                TERPOPULER
-              </span>
-            )}
-            <div style={{width:22, height:22, borderRadius:"50%", border: plan===p.id ? `7px solid ${C.gold}` : `2px solid ${C.border}`, flexShrink:0}}/>
-            <div style={{flex:1}}>
-              <p style={{fontSize:14, fontWeight:700, color:C.text, margin:0}}>{p.name}</p>
-              <p style={{fontSize:11, color:C.textM, margin:"2px 0 0"}}>{p.desc}</p>
-            </div>
-            <div style={{textAlign:"right"}}>
-              <p style={{fontSize:16, fontWeight:800, color:C.text, margin:0}}>{fmtS(p.price)}</p>
-              <p style={{fontSize:10, color:C.textM, margin:0}}>{p.period}</p>
-            </div>
-          </button>
-        ))}
-
-        {/* Features */}
-        <div style={card}>
-          <p style={{fontSize:13, fontWeight:700, color:C.text, margin:"0 0 10px"}}>Yang Kamu Dapatkan:</p>
-          <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:8}}>
-            {features.map((f,i)=>(
-              <div key={i} style={{display:"flex", alignItems:"flex-start", gap:6}}>
-                <CheckCircle2 size={14} color={C.pri} style={{flexShrink:0, marginTop:2}}/>
-                <span style={{fontSize:11, color:C.text, lineHeight:1.4}}>{f}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Trust */}
-        <div style={{background:C.priBg, borderRadius:14, padding:"12px 14px", display:"flex", alignItems:"center", gap:10}}>
-          <Shield size={20} color={C.pri}/>
-          <div style={{flex:1, fontSize:11, color:C.priD, lineHeight:1.5}}>
-            <b>Garansi 7 hari uang kembali.</b> Tidak puas? Kami refund 100%.
-          </div>
-        </div>
-
-        <button onClick={()=>alert("Demo: Berlangganan akan terhubung ke Google Play Billing")} style={{background:`linear-gradient(135deg, ${C.gold}, #b45309)`, border:"none", borderRadius:14, padding:"16px", color:"#fff", fontSize:15, fontWeight:800, cursor:"pointer", boxShadow:"0 6px 20px rgba(217,119,6,0.35)", display:"flex", alignItems:"center", justifyContent:"center", gap:8}}>
-          <Zap size={18}/> Mulai Berlangganan Sekarang
-        </button>
-
-        <p style={{textAlign:"center", fontSize:10, color:C.textL, margin:0, lineHeight:1.5}}>
-          Pembayaran dikelola Google Play.<br/>Bisa dibatalkan kapan saja.
         </p>
       </div>
     </div>
