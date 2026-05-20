@@ -70,6 +70,7 @@ const INIT_GOALS = [
 
 const MONTHS = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
 const MONTH_SHORT = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
+const CHART_MONTH_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
 const STORAGE_KEYS = {
   txs: "amanBudget.transactions",
@@ -254,6 +255,31 @@ const calcWeekData = txs => {
     if(tx.type==="expense"&&tx.status==="selesai") weeks[idx].out += tx.amt;
   });
   return weeks;
+};
+
+const calcCashflowChartData = (txs, period) => {
+  const p = normalizePeriod(period);
+  if(p.mode !== "range") return calcWeekData(txs);
+
+  const startKey = monthKey(p.startYear, p.startMonth);
+  const endKey = monthKey(p.endYear, p.endMonth);
+  const months = [];
+  for(let key = startKey; key <= endKey; key += 1) {
+    const year = Math.floor((key - 1) / 12);
+    const month = ((key - 1) % 12) + 1;
+    months.push({key, w:`${CHART_MONTH_SHORT[month - 1]} ${String(year).slice(-2)}`, in:0, out:0});
+  }
+
+  const byMonth = new Map(months.map(month=>[month.key, month]));
+  txs.forEach(tx=>{
+    const [year, month] = (tx.date || "").split("-").map(Number);
+    if(!validYear(year)||!validMonth(month)) return;
+    const bucket = byMonth.get(monthKey(year, month));
+    if(!bucket) return;
+    if(tx.type==="income"&&tx.status==="selesai") bucket.in += tx.amt;
+    if(tx.type==="expense"&&tx.status==="selesai") bucket.out += tx.amt;
+  });
+  return months;
 };
 
 // ─── Reusable UI ───
@@ -620,7 +646,8 @@ const ReportsScreen = ({txs, period, setPeriod, years, openUpgrade}) => {
   const s = calcSummary(txs);
   const grps = calcGroups(txs);
   const pieData = Object.entries(grps).map(([k,v])=>({name:GROUPS[k]?.label, value:v.budget, color:GROUPS[k]?.color}));
-  const weekData = calcWeekData(txs);
+  const chartData = calcCashflowChartData(txs, period);
+  const chartTitle = normalizePeriod(period).mode === "range" ? "Arus Kas Bulanan" : "Arus Kas Mingguan";
   const periodLabel = formatPeriodLabel(period);
 
   const top5 = txs.filter(x=>x.type==="expense"&&x.status!=="batal").sort((a,b)=>b.amt-a.amt).slice(0,5);
@@ -677,12 +704,12 @@ const ReportsScreen = ({txs, period, setPeriod, years, openUpgrade}) => {
           </div>
         </div>
 
-        {/* Bar chart - weekly */}
+        {/* Bar chart */}
         <div style={card}>
-          <p style={{fontSize:13, fontWeight:700, color:C.text, margin:"0 0 10px"}}>Arus Kas Mingguan</p>
+          <p style={{fontSize:13, fontWeight:700, color:C.text, margin:"0 0 10px"}}>{chartTitle}</p>
           <div style={{height:160}}>
             <ResponsiveContainer>
-              <BarChart data={weekData} barGap={2}>
+              <BarChart data={chartData} barGap={2}>
                 <XAxis dataKey="w" tick={{fontSize:11, fill:C.textM}} axisLine={false} tickLine={false}/>
                 <YAxis hide/>
                 <Tooltip formatter={v=>fmtS(v)} contentStyle={{borderRadius:10, border:"none", boxShadow:"0 4px 16px rgba(0,0,0,0.1)", fontSize:12}}/>
