@@ -1,54 +1,181 @@
-import { useMemo, useState } from "react";
-import { Check, Copy, FileDown, Send, Shield, Sparkles } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { Check, Copy, FileDown, ImageDown, Send, Shield, Sparkles } from "lucide-react";
+import { toJpeg } from "html-to-image";
 import Header from "../components/layout/Header";
-import { GROUPS } from "../constants/app";
+import { GROUPS, STATUS } from "../constants/app";
 import { C } from "../constants/theme";
-import { fmt } from "../utils/format";
+import { fmt, fmtS } from "../utils/format";
+import { calcGoalTransactionSaved } from "../utils/goals";
+import { formatPeriodLabel, formatShortDate } from "../utils/period";
 import { calcGroups, calcSummary } from "../utils/summary";
 
-const ShareScreen = ({txs, setSubPage}) => {
-  const [format, setFormat] = useState("whatsapp");
-  const [copied, setCopied] = useState(false);
-  const s = calcSummary(txs);
-  const grps = calcGroups(txs);
-  const unpaid = txs.filter(x=>x.status==="belum_selesai");
-  const top5 = txs.filter(x=>x.type==="expense"&&x.status!=="batal").sort((a,b)=>b.amt-a.amt).slice(0,5);
+const resolveTxGrp = tx => (tx.grp && GROUPS[tx.grp]) ? tx.grp : "lain_lain";
 
-  const waText = useMemo(() => {
-    let t = "📊 *LAPORAN KEUANGAN KELUARGA*\n";
-    t += "_Mei 2026 · Keluarga Malik_\n";
-    t += "━━━━━━━━━━━━━━━━━━━━\n\n";
-    t += "💰 *RINGKASAN BULAN INI*\n";
-    t += "```\n";
-    t += `Pemasukan    : ${fmt(s.totalIncome)}\n`;
-    t += `Pengeluaran  : ${fmt(s.paid)}\n`;
-    t += `Saldo Aktual : ${fmt(s.actBal)}\n`;
-    t += `Sisa Aman    : ${fmt(s.safeBal)}\n`;
-    t += `Progress     : ${s.prog}%\n`;
-    t += "```\n\n";
-    t += "📋 *REKAP PER GRUP*\n";
-    Object.entries(grps).sort((a,b)=>b[1].budget-a[1].budget).forEach(([k,v])=>{
-      t += `• ${GROUPS[k]?.label} — ${fmt(v.budget)}\n`;
+// ── Ultra-compact table cell styles ──
+const TH = {padding:"2px 4px", textAlign:"left", color:"#fff", fontWeight:700, fontSize:7, lineHeight:1.1};
+const TD = {padding:"2px 4px", fontSize:7, color:"#111827", borderBottom:"1px solid #e5e7eb", lineHeight:1.1};
+
+const secHead = (bg) => ({
+  fontSize:7, color:"#fff", margin:0, fontWeight:800, letterSpacing:0.3,
+  background:bg, padding:"2px 5px", borderRadius:"3px 3px 0 0", display:"block", lineHeight:1.1,
+});
+
+const calcSubtotal = grpTxs => ({
+  total:    grpTxs.reduce((s, tx) => s + tx.amt, 0),
+  selesai:  grpTxs.filter(tx => tx.status === "selesai").reduce((s, tx) => s + tx.amt, 0),
+  belum:    grpTxs.filter(tx => tx.status === "belum_selesai").reduce((s, tx) => s + tx.amt, 0),
+  estimasi: grpTxs.filter(tx => tx.status === "estimasi").reduce((s, tx) => s + tx.amt, 0),
+});
+
+const GrpTable = ({grpKey, txList, goals}) => {
+  const sub     = calcSubtotal(txList);
+  const grpInfo = GROUPS[grpKey];
+  const hasGoal = txList.some(tx => tx.goalId);
+  return (
+    <div className="rpt-sec" style={{marginBottom:5}}>
+      <span className="rpt-hd" style={secHead(grpInfo.color)}>
+        PENGELUARAN {grpInfo.label.toUpperCase()} ({txList.length})
+      </span>
+      <table className="rpt-table" style={{width:"100%", fontSize:7, borderCollapse:"collapse", border:`1px solid ${C.borderL}`, borderTop:"none"}}>
+        <thead>
+          <tr style={{background:grpInfo.color + "22"}}>
+            <th style={{...TH, color:grpInfo.color, width:18, textAlign:"center"}}>#</th>
+            <th style={{...TH, color:grpInfo.color}}>Deskripsi</th>
+            <th style={{...TH, color:grpInfo.color, textAlign:"right"}}>Jumlah</th>
+            <th style={{...TH, color:grpInfo.color, textAlign:"center"}}>Status</th>
+            {hasGoal && <th style={{...TH, color:grpInfo.color}}>Goal</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {txList.map((tx, i) => {
+            const st       = STATUS[tx.status];
+            const goalName = tx.goalId ? (goals.find(g => g.id === tx.goalId)?.name ?? null) : null;
+            return (
+              <tr className="rpt-tr" key={tx.id} style={{background: i % 2 === 0 ? "#fff" : grpInfo.color + "09"}}>
+                <td style={{...TD, textAlign:"center", color:C.textM}}>{i + 1}</td>
+                <td style={TD}>
+                  <div style={{fontWeight:600, lineHeight:1.2}}>{tx.desc}</div>
+                  <div style={{fontSize:6, color:C.textL, lineHeight:1.05}}>{formatShortDate(tx.date)} · {tx.cat}</div>
+                </td>
+                <td style={{...TD, textAlign:"right", fontWeight:700}}>{fmtS(tx.amt)}</td>
+                <td style={{...TD, textAlign:"center"}}>
+                  {st && <span style={{background:st.bg, color:st.color, fontSize:6, fontWeight:700, padding:"1px 2px", borderRadius:2, lineHeight:1.1, display:"inline-block"}}>{st.label}</span>}
+                </td>
+                {hasGoal && <td style={{...TD, fontSize:6, color:C.priD}}>{goalName || ""}</td>}
+              </tr>
+            );
+          })}
+        </tbody>
+        <tfoot className="rpt-tfoot">
+          <tr style={{background:grpInfo.color + "18"}}>
+            <td colSpan={2} style={{padding:"2px 4px", fontWeight:800, color:grpInfo.color, fontSize:7, lineHeight:1.1}}>Subtotal</td>
+            <td style={{padding:"2px 4px", fontWeight:800, color:grpInfo.color, textAlign:"right", fontSize:7, lineHeight:1.1}}>{fmt(sub.total)}</td>
+            <td style={{padding:"2px 4px", fontSize:6, color:C.textM, lineHeight:1.1}}>
+              {sub.selesai  > 0 && <span style={{color:C.pri}}>✓ {fmtS(sub.selesai)}</span>}
+              {sub.belum    > 0 && <span style={{color:C.red, marginLeft:sub.selesai > 0 ? 3 : 0}}>⚠ {fmtS(sub.belum)}</span>}
+              {sub.estimasi > 0 && sub.selesai === 0 && sub.belum === 0 &&
+                <span style={{color:C.textM}}>~ {fmtS(sub.estimasi)}</span>}
+            </td>
+            {hasGoal && <td/>}
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  );
+};
+
+const ShareScreen = ({txs, allTxs = [], goals = [], period = null, setSubPage}) => {
+  const [format, setFormat]       = useState("whatsapp");
+  const [copied, setCopied]       = useState(false);
+  const [filterGrp, setFilterGrp] = useState("all");
+  const [exportingJpg, setExportingJpg] = useState(false);
+  const reportRef = useRef(null);
+
+  const s           = calcSummary(txs);
+  const grps        = calcGroups(txs);
+  const unpaid      = txs.filter(x => x.status === "belum_selesai");
+  const periodLabel = formatPeriodLabel(period);
+
+  const goalsCalc = useMemo(() => goals.map(g => {
+    const manualSaved    = Number(g.saved || 0);
+    const txSaved        = calcGoalTransactionSaved(allTxs, g);
+    const displayedSaved = manualSaved + txSaved;
+    const target         = Number(g.target || 0);
+    const pct            = target > 0 ? Math.min(Math.round(displayedSaved / target * 100), 100) : 0;
+    return {...g, manualSaved, txSaved, displayedSaved, pct};
+  }), [goals, allTxs]);
+
+  const totalGoalTarget = goalsCalc.reduce((sum, g) => sum + Number(g.target || 0), 0);
+  const totalGoalSaved  = goalsCalc.reduce((sum, g) => sum + g.displayedSaved, 0);
+
+  const incomeTxs = useMemo(() =>
+    txs.filter(tx => tx.type === "income").sort((a, b) => b.date.localeCompare(a.date)),
+  [txs]);
+
+  const groupedExpenses = useMemo(() => {
+    const map = {};
+    Object.keys(GROUPS).forEach(k => { map[k] = []; });
+    txs.filter(tx => tx.type === "expense").forEach(tx => {
+      map[resolveTxGrp(tx)].push(tx);
     });
-    t += "\n";
-    if(unpaid.length > 0) {
-      t += "⚠️ *BELUM DIBAYAR*\n";
-      unpaid.forEach(tx => { t += `• ${tx.desc} — ${fmt(tx.amt)}\n`; });
-      t += "\n";
-    }
-    t += "🏆 *TOP 5 PENGELUARAN*\n";
-    top5.forEach((tx, i) => { t += `${i+1}. ${tx.desc}\n   _${fmt(tx.amt)}_\n`; });
-    t += "\n━━━━━━━━━━━━━━━━━━━━\n";
-    t += "_Dibuat dengan AMAN Budget_\n";
-    t += "🌐 amandigital.web.id";
-    return t;
-  }, [s, grps, unpaid, top5]);
+    Object.keys(map).forEach(k => map[k].sort((a, b) => b.date.localeCompare(a.date)));
+    return map;
+  }, [txs]);
+
+  const activeGroups  = Object.keys(GROUPS).filter(k => groupedExpenses[k]?.length > 0);
+  const visibleGroups = filterGrp === "all"
+    ? activeGroups
+    : (groupedExpenses[filterGrp]?.length > 0 ? [filterGrp] : []);
+
+  const kpis = [
+    {label:"Total Pemasukan",  value:fmt(s.totalIncome), color:C.pri,                                border:`2px solid ${C.pri}`},
+    {label:"Est. Pengeluaran", value:fmt(s.estExp),       color:C.text,                               border:`2px solid ${C.border}`},
+    {label:"Sdh Dibayar",      value:fmt(s.paid),         color:C.red,                                border:`2px solid ${C.red}`},
+    {label:"Saldo Aktual",     value:fmt(s.actBal),       color:s.actBal  >= 0 ? C.pri : C.red,      border:`2px solid ${s.actBal  >= 0 ? C.pri : C.red}`},
+    {label:"Sisa Aman",        value:fmt(s.safeBal),      color:s.safeBal >= 0 ? C.pri : C.red,      border:`2px solid ${s.safeBal >= 0 ? C.pri : C.red}`},
+    {label:"Belum Bayar",      value:fmt(s.unpaid),       color:unpaid.length > 0 ? C.red : C.textM, border:`2px solid ${unpaid.length > 0 ? C.red : C.border}`},
+  ];
+
+  // ── WhatsApp text ──
+  let waText = "📊 *LAPORAN KEUANGAN KELUARGA*\n";
+  waText += `_${periodLabel}_\n`;
+  waText += "━━━━━━━━━━━━━━━━━━━━\n\n";
+  waText += "💰 *RINGKASAN*\n";
+  waText += "```\n";
+  waText += `Pemasukan    : ${fmt(s.totalIncome)}\n`;
+  waText += `Pengeluaran  : ${fmt(s.paid)}\n`;
+  waText += `Saldo Aktual : ${fmt(s.actBal)}\n`;
+  waText += `Sisa Aman    : ${fmt(s.safeBal)}\n`;
+  waText += `Progress     : ${s.prog}%\n`;
+  if (unpaid.length > 0) waText += `Belum Bayar  : ${fmt(s.unpaid)} (${unpaid.length} item)\n`;
+  waText += "```\n\n";
+  waText += "📋 *REKAP PER GRUP*\n";
+  Object.entries(grps).sort((a, b) => b[1].budget - a[1].budget).forEach(([k, v]) => {
+    waText += `• ${GROUPS[k]?.label} — ${fmt(v.budget)}\n`;
+  });
+  waText += "\n";
+  if (goalsCalc.length > 0) {
+    waText += "🎯 *PROGRESS GOALS*\n";
+    waText += "```\n";
+    goalsCalc.forEach(g => {
+      waText += `${g.name}\n  ${fmt(g.displayedSaved)} / ${fmt(Number(g.target || 0))} (${g.pct}%)\n`;
+    });
+    waText += "```\n\n";
+  }
+  if (unpaid.length > 0) {
+    waText += "⚠️ *BELUM DIBAYAR*\n";
+    unpaid.forEach(tx => { waText += `• ${tx.desc} — ${fmt(tx.amt)}\n`; });
+    waText += "\n";
+  }
+  waText += "━━━━━━━━━━━━━━━━━━━━\n";
+  waText += "_Dibuat dengan AMAN Budget_\n";
+  waText += "🌐 amandigital.web.id";
 
   const copyText = async () => {
     try {
       await navigator.clipboard.writeText(waText);
       setCopied(true);
-      setTimeout(()=>setCopied(false), 2000);
+      setTimeout(() => setCopied(false), 2000);
     } catch {
       const ta = document.createElement("textarea");
       ta.value = waText;
@@ -56,58 +183,85 @@ const ShareScreen = ({txs, setSubPage}) => {
       ta.style.opacity = "0";
       document.body.appendChild(ta);
       ta.select();
-      try { document.execCommand("copy"); } catch {
-        // Keep the same fallback flow even if legacy copy is unavailable.
-      }
+      try { document.execCommand("copy"); } catch { /* ignore */ }
       document.body.removeChild(ta);
       setCopied(true);
-      setTimeout(()=>setCopied(false), 2000);
+      setTimeout(() => setCopied(false), 2000);
     }
   };
 
   const shareWA = () => {
-    const url = `https://wa.me/?text=${encodeURIComponent(waText)}`;
-    window.open(url, "_blank");
+    window.open(`https://wa.me/?text=${encodeURIComponent(waText)}`, "_blank");
   };
 
-  const downloadPDF = () => { window.print(); };
+  const exportJpg = async () => {
+    if (!reportRef.current) return;
+    setExportingJpg(true);
+    try {
+      const dataUrl = await toJpeg(reportRef.current, {
+        quality: 0.93,
+        pixelRatio: 2,
+        backgroundColor: "#fff",
+        skipAutoScale: false,
+      });
+      const now = new Date();
+      const pad = n => String(n).padStart(2, "0");
+      const fname = `aman-budget-report-${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}.jpg`;
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = fname;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch {
+      alert("Gagal export JPG. Coba lagi.");
+    } finally {
+      setExportingJpg(false);
+    }
+  };
 
   return (
     <>
       <style>{`
         @media print {
           html, body { background: white !important; margin: 0 !important; padding: 0 !important; }
-          body > div, body > div > div { max-width: 100% !important; width: 100% !important; background: white !important; }
-          .no-print { display: none !important; }
+          body * { visibility: hidden !important; }
+          .print-area, .print-area * { visibility: visible !important; }
           .print-area {
-            box-shadow: none !important;
-            border: none !important;
-            border-radius: 0 !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            max-width: 100% !important;
+            position: absolute !important; top: 0 !important; left: 0 !important;
+            right: 0 !important; width: 100% !important; overflow: visible !important;
+            padding: 6px !important; margin: 0 !important; border: none !important;
+            box-shadow: none !important; border-radius: 0 !important;
           }
+          .rpt-table th { padding: 1px 3px !important; font-size: 6pt !important; line-height: 1.1 !important; }
+          .rpt-table td { padding: 1px 3px !important; font-size: 6pt !important; line-height: 1.1 !important; }
+          .rpt-hd     { font-size: 6pt !important; padding: 2px 5px !important; line-height: 1.1 !important; page-break-after: avoid !important; break-after: avoid !important; }
+          .rpt-tfoot  { page-break-before: avoid !important; break-before: avoid !important; }
+          .rpt-sec-sm { page-break-inside: avoid !important; break-inside: avoid !important; }
+          .rpt-tr     { page-break-inside: avoid !important; break-inside: avoid !important; }
           * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-          @page { margin: 15mm; size: A4; }
+          @page { margin: 7mm; size: A4; }
         }
       `}</style>
+
       <div style={{flex:1, overflowY:"auto", paddingBottom:92, background:C.bg}}>
+
         <div className="no-print">
-          <Header title="Bagikan Laporan" subtitle="Mei 2026 · Keluarga Malik" onBack={()=>setSubPage(null)}/>
+          <Header title="Export Laporan" subtitle={periodLabel} onBack={()=>setSubPage(null)}/>
         </div>
 
         <div className="no-print" style={{padding:"14px 14px 0"}}>
           <div style={{background:"#fff", borderRadius:14, padding:4, display:"flex", border:`1px solid ${C.borderL}`, boxShadow:"0 1px 4px rgba(0,0,0,0.03)"}}>
             {[
-              {id:"whatsapp", label:"WhatsApp", icon:Send, color:"#25d366"},
-              {id:"pdf", label:"PDF", icon:FileDown, color:C.red},
+              {id:"whatsapp", label:"WhatsApp",   icon:Send,     color:"#25d366"},
+              {id:"pdf",      label:"PDF / Print", icon:FileDown, color:C.red},
             ].map(opt => (
               <button key={opt.id} onClick={()=>setFormat(opt.id)} style={{
                 flex:1, padding:"11px", borderRadius:10, border:"none", cursor:"pointer",
                 background: format===opt.id ? opt.color+"15" : "transparent",
-                color: format===opt.id ? opt.color : C.textM,
+                color:      format===opt.id ? opt.color      : C.textM,
                 fontSize:13, fontWeight:700, display:"flex", alignItems:"center", justifyContent:"center", gap:6,
-                transition:"all .2s"
+                transition:"all .2s",
               }}>
                 <opt.icon size={15}/> {opt.label}
               </button>
@@ -115,129 +269,114 @@ const ShareScreen = ({txs, setSubPage}) => {
           </div>
         </div>
 
+        {/* ─── WhatsApp Tab ─── */}
         {format === "whatsapp" ? (
           <div className="no-print" style={{padding:"12px 14px 14px", display:"flex", flexDirection:"column", gap:12}}>
             <div style={{background:"#e5ddd5", borderRadius:14, padding:"14px 12px", boxShadow:"inset 0 2px 8px rgba(0,0,0,0.05)"}}>
               <div style={{background:"#dcf8c6", borderRadius:8, borderTopRightRadius:2, padding:"10px 12px 6px", maxWidth:"94%", marginLeft:"auto", boxShadow:"0 1px 2px rgba(0,0,0,0.13)"}}>
                 <pre style={{margin:0, fontFamily:"-apple-system, system-ui, sans-serif", fontSize:11.5, color:"#111b21", whiteSpace:"pre-wrap", lineHeight:1.45, wordBreak:"break-word"}}>{waText}</pre>
                 <div style={{display:"flex", justifyContent:"flex-end", alignItems:"center", gap:4, marginTop:4, fontSize:10, color:"#667781"}}>
-                  <span>16:45</span>
+                  <span>{new Date().toLocaleTimeString("id-ID", {hour:"2-digit", minute:"2-digit"})}</span>
                   <svg width="14" height="11" viewBox="0 0 16 11" fill="#53bdeb"><path d="M11.07.65L4.25 7.48a.35.35 0 01-.49 0L1.05 4.77a.35.35 0 00-.48 0l-.57.57a.35.35 0 000 .49l2.71 2.71a1.16 1.16 0 001.64 0L11.87.99a.35.35 0 000-.49L11.31.04a.35.35 0 00-.49 0z"/></svg>
                 </div>
               </div>
             </div>
-
             <div style={{display:"flex", gap:8}}>
               <button onClick={copyText} style={{flex:1, padding:"14px", borderRadius:12, border:`1.5px solid ${copied?C.pri:C.border}`, background:copied?C.priL:"#fff", color:copied?C.priD:C.text, fontSize:13, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:6, transition:"all .2s"}}>
-                {copied ? <><Check size={16}/> Tersalin!</> : <><Copy size={16}/> Salin</>}
+                {copied ? <><Check size={16}/> Tersalin!</> : <><Copy size={16}/> Salin Teks</>}
               </button>
               <button onClick={shareWA} style={{flex:1.5, padding:"14px", borderRadius:12, border:"none", background:"#25d366", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:6, boxShadow:"0 6px 18px rgba(37,211,102,0.3)"}}>
                 <Send size={16}/> Kirim WhatsApp
               </button>
             </div>
-
             <div style={{background:C.priBg, borderRadius:12, padding:"12px 14px", display:"flex", gap:10, alignItems:"flex-start"}}>
               <Sparkles size={16} color={C.pri} style={{marginTop:2, flexShrink:0}}/>
               <p style={{margin:0, fontSize:11, color:C.priD, lineHeight:1.5}}>
-                Format sudah sesuai standar WhatsApp dengan <b>*bold*</b>, <i>_italic_</i>, dan emoji. Cocok dikirim ke grup keluarga.
+                Format sudah sesuai standar WhatsApp dengan <b>*bold*</b>, <i>_italic_</i>, dan emoji.
               </p>
             </div>
           </div>
+
         ) : (
+        /* ─── PDF / Print Tab ─── */
           <>
             <div className="no-print" style={{padding:"12px 14px 0"}}>
-              <div style={{background:"#fef2f2", borderRadius:12, padding:"12px 14px", display:"flex", gap:10, alignItems:"flex-start"}}>
-                <FileDown size={16} color={C.red} style={{marginTop:2, flexShrink:0}}/>
+              <div style={{background:"#fef2f2", borderRadius:12, padding:"10px 14px", display:"flex", gap:10, alignItems:"flex-start"}}>
+                <FileDown size={15} color={C.red} style={{marginTop:2, flexShrink:0}}/>
                 <p style={{margin:0, fontSize:11, color:"#991b1b", lineHeight:1.5}}>
-                  Tekan tombol <b>Download PDF</b> di bawah → di dialog cetak pilih <b>"Save as PDF"</b>.
+                  Tekan <b>Print / Simpan PDF</b> → pilih <b>"Save as PDF"</b> di dialog cetak.
                 </p>
               </div>
             </div>
 
-            <div className="print-area" style={{margin:"14px", background:"#fff", borderRadius:14, padding:"24px 20px", border:`1px solid ${C.borderL}`, boxShadow:"0 4px 20px rgba(0,0,0,0.06)"}}>
-              <div style={{textAlign:"center", paddingBottom:14, borderBottom:`3px solid ${C.pri}`, marginBottom:16}}>
-                <div style={{width:46, height:46, background:C.pri, borderRadius:12, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 8px"}}>
-                  <Shield size={24} color="#fff"/>
+            {/* Group filter */}
+            <div className="no-print" style={{padding:"10px 14px 0"}}>
+              <p style={{fontSize:11, fontWeight:700, color:C.textM, margin:"0 0 7px"}}>Filter Grup:</p>
+              <div style={{display:"flex", gap:6, overflowX:"auto", paddingBottom:4, scrollbarWidth:"none"}}>
+                {[{key:"all", label:"Semua Grup"}, ...Object.entries(GROUPS).map(([k, v]) => ({key:k, label:v.label}))].map(opt => (
+                  <button key={opt.key} onClick={()=>setFilterGrp(opt.key)} style={{
+                    padding:"6px 13px", borderRadius:20, border:"none", cursor:"pointer", whiteSpace:"nowrap",
+                    fontSize:11, fontWeight:700, flexShrink:0,
+                    background: filterGrp === opt.key ? C.pri : C.borderL,
+                    color:      filterGrp === opt.key ? "#fff" : C.textM,
+                    transition:"all .15s",
+                  }}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* ═══ PRINT AREA ═══ */}
+            <div ref={reportRef} className="print-area" style={{margin:"12px", background:"#fff", borderRadius:14, padding:"14px 12px 10px", border:`1px solid ${C.borderL}`, boxShadow:"0 4px 20px rgba(0,0,0,0.06)"}}>
+
+              {/* Report header */}
+              <div className="rpt-sec-sm" style={{textAlign:"center", paddingBottom:7, borderBottom:`2px solid ${C.pri}`, marginBottom:10}}>
+                <div style={{width:28, height:28, background:C.pri, borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 4px"}}>
+                  <Shield size={16} color="#fff"/>
                 </div>
-                <h2 style={{margin:0, fontSize:17, color:C.text, fontWeight:800, letterSpacing:-0.3}}>LAPORAN KEUANGAN</h2>
-                <p style={{margin:"3px 0 0", fontSize:11, color:C.textM, fontWeight:600}}>Periode: Mei 2026 · Keluarga Malik</p>
+                <h2 style={{margin:0, fontSize:13, color:C.text, fontWeight:800, letterSpacing:-0.3}}>AMAN BUDGET</h2>
+                <p style={{margin:"1px 0 0", fontSize:10, color:C.pri, fontWeight:700}}>Laporan Keuangan Keluarga</p>
+                <p style={{margin:"1px 0 0", fontSize:9, color:C.textM}}>Periode: {periodLabel}</p>
+                {filterGrp !== "all" && (
+                  <span style={{display:"inline-block", marginTop:3, background:C.priL, color:C.priD, fontSize:8, fontWeight:700, padding:"2px 7px", borderRadius:7}}>
+                    Filter: {GROUPS[filterGrp]?.label}
+                  </span>
+                )}
               </div>
 
-              <div style={{marginBottom:18}}>
-                <h3 style={{fontSize:11, color:C.pri, margin:"0 0 8px", fontWeight:800, letterSpacing:0.8}}>▎RINGKASAN BULAN INI</h3>
-                <table style={{width:"100%", fontSize:11, borderCollapse:"collapse"}}>
-                  <tbody>
-                    {[
-                      ["Total Pemasukan", fmt(s.totalIncome), C.pri],
-                      ["Total Pengeluaran (Terbayar)", fmt(s.paid), C.red],
-                      ["Estimasi Pengeluaran", fmt(s.estExp), C.text],
-                      ["Saldo Aktual", fmt(s.actBal), C.text],
-                      ["Estimasi Sisa Aman", fmt(s.safeBal), s.safeBal<0?C.red:C.pri],
-                      ["Progress Pembayaran", s.prog+"%", C.text],
-                    ].map(([k,v,c],i)=>(
-                      <tr key={i} style={{borderBottom:`1px solid ${C.borderL}`}}>
-                        <td style={{padding:"7px 0", color:C.textM}}>{k}</td>
-                        <td style={{padding:"7px 0", color:c, fontWeight:700, textAlign:"right"}}>{v}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              {/* KPI Cards */}
+              <div className="rpt-sec-sm" style={{marginBottom:5}}>
+                <p style={{fontSize:7, fontWeight:800, color:C.textM, margin:"0 0 3px", letterSpacing:0.5}}>RINGKASAN UTAMA</p>
+                <div style={{display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:4}}>
+                  {kpis.map((kpi, i) => (
+                    <div key={i} style={{background:"#fff", border:kpi.border, borderRadius:6, padding:"5px 4px", textAlign:"center"}}>
+                      <p style={{fontSize:7, color:C.textM, margin:0, fontWeight:600, lineHeight:1.2}}>{kpi.label}</p>
+                      <p style={{fontSize:9, fontWeight:800, color:kpi.color, margin:"2px 0 0", lineHeight:1.2}}>{kpi.value}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
 
-              <div style={{marginBottom:18}}>
-                <h3 style={{fontSize:11, color:C.pri, margin:"0 0 8px", fontWeight:800, letterSpacing:0.8}}>▎REKAP PER GRUP</h3>
-                <table style={{width:"100%", fontSize:11, borderCollapse:"collapse"}}>
-                  <thead>
-                    <tr style={{borderBottom:`2px solid ${C.text}`}}>
-                      <th style={{padding:"7px 0", textAlign:"left", color:C.text, fontWeight:700}}>Grup</th>
-                      <th style={{padding:"7px 0", textAlign:"right", color:C.text, fontWeight:700}}>Budget</th>
-                      <th style={{padding:"7px 0", textAlign:"right", color:C.pri, fontWeight:700}}>Selesai</th>
-                      <th style={{padding:"7px 0", textAlign:"right", color:C.red, fontWeight:700}}>Belum</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {Object.entries(grps).sort((a,b)=>b[1].budget-a[1].budget).map(([k,v])=>(
-                      <tr key={k} style={{borderBottom:`1px solid ${C.borderL}`}}>
-                        <td style={{padding:"6px 0", color:C.text, fontWeight:600}}>{GROUPS[k]?.label}</td>
-                        <td style={{padding:"6px 0", textAlign:"right", color:C.text}}>{fmt(v.budget)}</td>
-                        <td style={{padding:"6px 0", textAlign:"right", color:C.pri, fontWeight:600}}>{fmt(v.paid)}</td>
-                        <td style={{padding:"6px 0", textAlign:"right", color:C.red, fontWeight:600}}>{fmt(v.unpaid)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div style={{marginBottom:18}}>
-                <h3 style={{fontSize:11, color:C.pri, margin:"0 0 8px", fontWeight:800, letterSpacing:0.8}}>▎TOP 5 PENGELUARAN</h3>
-                <table style={{width:"100%", fontSize:11, borderCollapse:"collapse"}}>
-                  <tbody>
-                    {top5.map((tx,i)=>(
-                      <tr key={tx.id} style={{borderBottom:`1px solid ${C.borderL}`}}>
-                        <td style={{padding:"7px 0", width:28, color:C.priD, fontWeight:800}}>#{i+1}</td>
-                        <td style={{padding:"7px 0"}}>
-                          <div style={{fontWeight:600, color:C.text}}>{tx.desc}</div>
-                          <div style={{fontSize:10, color:C.textM, marginTop:1}}>{GROUPS[tx.grp]?.label} · {tx.date}</div>
-                        </td>
-                        <td style={{padding:"7px 0", textAlign:"right", color:C.text, fontWeight:700}}>{fmt(tx.amt)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {unpaid.length > 0 && (
-                <div style={{marginBottom:18}}>
-                  <h3 style={{fontSize:11, color:C.red, margin:"0 0 8px", fontWeight:800, letterSpacing:0.8}}>▎⚠ BELUM DIBAYAR</h3>
-                  <table style={{width:"100%", fontSize:11, borderCollapse:"collapse"}}>
+              {/* Rekapitulasi */}
+              {filterGrp === "all" && (
+                <div className="rpt-sec-sm" style={{marginBottom:5}}>
+                  <span className="rpt-hd" style={secHead(C.pri)}>REKAPITULASI</span>
+                  <table className="rpt-table" style={{width:"100%", fontSize:7, borderCollapse:"collapse", border:`1px solid ${C.borderL}`, borderTop:"none"}}>
                     <tbody>
-                      {unpaid.map(tx=>(
-                        <tr key={tx.id} style={{borderBottom:`1px solid ${C.borderL}`}}>
-                          <td style={{padding:"6px 0"}}>
-                            <div style={{color:C.text, fontWeight:600}}>{tx.desc}</div>
-                            <div style={{fontSize:10, color:C.textM}}>{GROUPS[tx.grp]?.label}</div>
-                          </td>
-                          <td style={{padding:"6px 0", textAlign:"right", color:C.red, fontWeight:700}}>{fmt(tx.amt)}</td>
+                      {[
+                        ["Rencana Pemasukan",   fmt(s.incomePlan),  C.pri],
+                        ["Pemasukan Aktual",     fmt(s.totalIncome), C.pri],
+                        ["Estimasi Pengeluaran", fmt(s.estExp),      C.text],
+                        ["Pengeluaran Selesai",  fmt(s.paid),        C.red],
+                        ["Belum Dibayar",        fmt(s.unpaid),      unpaid.length > 0 ? C.red : C.textM],
+                        ["Saldo Aktual",         fmt(s.actBal),      s.actBal  >= 0 ? C.pri : C.red],
+                        ["Sisa Aman",            fmt(s.safeBal),     s.safeBal >= 0 ? C.pri : C.red],
+                        ["Progress Pembayaran",  s.prog + "%",       C.text],
+                      ].map(([k, v, c], i) => (
+                        <tr className="rpt-tr" key={i} style={{background: i % 2 === 0 ? C.priBg : "#fff"}}>
+                          <td style={{padding:"2px 4px", color:C.textM, borderBottom:`1px solid ${C.borderL}`, fontSize:7, lineHeight:1.1}}>{k}</td>
+                          <td style={{padding:"2px 4px", color:c, fontWeight:700, textAlign:"right", borderBottom:`1px solid ${C.borderL}`, fontSize:7, lineHeight:1.1}}>{v}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -245,19 +384,114 @@ const ShareScreen = ({txs, setSubPage}) => {
                 </div>
               )}
 
-              <div style={{borderTop:`1px solid ${C.borderL}`, paddingTop:12, marginTop:8, textAlign:"center"}}>
-                <p style={{fontSize:10, color:C.textM, margin:0}}>
-                  Laporan ini dibuat otomatis oleh <b style={{color:C.pri}}>AMAN Budget</b>
+              {/* Pemasukan section */}
+              {filterGrp === "all" && incomeTxs.length > 0 && (
+                <div className="rpt-sec" style={{marginBottom:5}}>
+                  <span className="rpt-hd" style={secHead(C.pri)}>PEMASUKAN ({incomeTxs.length})</span>
+                  <table className="rpt-table" style={{width:"100%", fontSize:7, borderCollapse:"collapse", border:`1px solid ${C.borderL}`, borderTop:"none"}}>
+                    <thead>
+                      <tr style={{background:C.priBg}}>
+                        <th style={{...TH, color:C.priD, width:18, textAlign:"center"}}>#</th>
+                        <th style={{...TH, color:C.priD}}>Deskripsi</th>
+                        <th style={{...TH, color:C.priD, textAlign:"right"}}>Jumlah</th>
+                        <th style={{...TH, color:C.priD, textAlign:"center"}}>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {incomeTxs.map((tx, i) => {
+                        const st = STATUS[tx.status];
+                        return (
+                          <tr className="rpt-tr" key={tx.id} style={{background: i % 2 === 0 ? "#fff" : C.priBg}}>
+                            <td style={{...TD, textAlign:"center", color:C.textM}}>{i + 1}</td>
+                            <td style={TD}>
+                              <div style={{fontWeight:600, lineHeight:1.2}}>{tx.desc}</div>
+                              <div style={{fontSize:6, color:C.textL, lineHeight:1.05}}>{formatShortDate(tx.date)} · {tx.cat}</div>
+                            </td>
+                            <td style={{...TD, textAlign:"right", fontWeight:700, color:C.pri}}>{fmtS(tx.amt)}</td>
+                            <td style={{...TD, textAlign:"center"}}>
+                              {st && <span style={{background:st.bg, color:st.color, fontSize:6, fontWeight:700, padding:"1px 2px", borderRadius:2, lineHeight:1.1, display:"inline-block"}}>{st.label}</span>}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot className="rpt-tfoot">
+                      <tr style={{background:C.priL}}>
+                        <td colSpan={2} style={{padding:"2px 4px", fontWeight:800, color:C.priD, fontSize:7, lineHeight:1.1}}>Total Pemasukan</td>
+                        <td style={{padding:"2px 4px", fontWeight:800, color:C.priD, textAlign:"right", fontSize:7, lineHeight:1.1}}>{fmt(s.totalIncome)}</td>
+                        <td/>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+
+              {/* Per-group expense sections */}
+              {visibleGroups.map(grpKey => (
+                <GrpTable key={grpKey} grpKey={grpKey} txList={groupedExpenses[grpKey]} goals={goals}/>
+              ))}
+
+              {visibleGroups.length === 0 && filterGrp !== "all" && (
+                <div style={{textAlign:"center", padding:"20px 0", color:C.textL}}>
+                  <p style={{fontSize:11, margin:0}}>Tidak ada transaksi untuk grup ini.</p>
+                </div>
+              )}
+
+              {/* Goals summary */}
+              {goalsCalc.length > 0 && (
+                <div className="rpt-sec-sm" style={{marginBottom:5}}>
+                  <span className="rpt-hd" style={secHead(C.gold)}>RINGKASAN GOALS</span>
+                  <table className="rpt-table" style={{width:"100%", fontSize:7, borderCollapse:"collapse", border:`1px solid ${C.borderL}`, borderTop:"none"}}>
+                    <thead>
+                      <tr style={{background:"#fffbeb"}}>
+                        <th style={{...TH, color:C.goldD}}>Goal</th>
+                        <th style={{...TH, color:C.goldD, textAlign:"right"}}>Target</th>
+                        <th style={{...TH, color:C.goldD, textAlign:"right"}}>Terkumpul</th>
+                        <th style={{...TH, color:C.goldD, textAlign:"right", width:28}}>%</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {goalsCalc.map((g, i) => (
+                        <tr className="rpt-tr" key={g.id} style={{background: i % 2 === 0 ? "#fff" : "#fffbeb"}}>
+                          <td style={TD}><span style={{fontWeight:600}}>{g.name}</span></td>
+                          <td style={{...TD, textAlign:"right", color:C.textM}}>{fmtS(Number(g.target || 0))}</td>
+                          <td style={{...TD, textAlign:"right", fontWeight:700, color:C.pri}}>{fmtS(g.displayedSaved)}</td>
+                          <td style={{...TD, textAlign:"right", fontWeight:700, color:g.pct >= 100 ? C.pri : C.text}}>{g.pct}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="rpt-tfoot">
+                      <tr style={{background:C.goldL}}>
+                        <td style={{padding:"2px 4px", fontWeight:800, color:C.goldD, fontSize:7, lineHeight:1.1}}>Total</td>
+                        <td style={{padding:"2px 4px", textAlign:"right", fontWeight:800, color:C.goldD, fontSize:7, lineHeight:1.1}}>{fmtS(totalGoalTarget)}</td>
+                        <td style={{padding:"2px 4px", textAlign:"right", fontWeight:800, color:C.pri,   fontSize:7, lineHeight:1.1}}>{fmtS(totalGoalSaved)}</td>
+                        <td style={{padding:"2px 4px", textAlign:"right", fontWeight:800, color:C.goldD, fontSize:7, lineHeight:1.1}}>
+                          {totalGoalTarget > 0 ? Math.round(totalGoalSaved / totalGoalTarget * 100) : 0}%
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+
+              {/* Footer */}
+              <div style={{borderTop:`1px solid ${C.borderL}`, paddingTop:4, textAlign:"center"}}>
+                <p style={{fontSize:7, color:C.textM, margin:0}}>
+                  Laporan dibuat otomatis oleh <b style={{color:C.pri}}>AMAN Budget</b>
                 </p>
-                <p style={{fontSize:9, color:C.textL, margin:"3px 0 0"}}>
+                <p style={{fontSize:6, color:C.textL, margin:"1px 0 0"}}>
                   amandigital.web.id · Dicetak {new Date().toLocaleDateString("id-ID", {day:"numeric", month:"long", year:"numeric"})}
                 </p>
               </div>
             </div>
+            {/* ═══ END PRINT AREA ═══ */}
 
-            <div className="no-print" style={{padding:"0 14px 14px"}}>
-              <button onClick={downloadPDF} style={{width:"100%", padding:"15px", borderRadius:14, border:"none", background:`linear-gradient(135deg, ${C.red}, #b91c1c)`, color:"#fff", fontSize:14, fontWeight:800, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8, boxShadow:"0 8px 24px rgba(220,38,38,0.4)"}}>
-                <FileDown size={18}/> Download / Cetak PDF
+            <div className="no-print" style={{padding:"0 14px 14px", display:"flex", flexDirection:"column", gap:8}}>
+              <button onClick={()=>window.print()} style={{width:"100%", padding:"15px", borderRadius:14, border:"none", background:`linear-gradient(135deg, ${C.red}, #b91c1c)`, color:"#fff", fontSize:14, fontWeight:800, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8, boxShadow:"0 8px 24px rgba(220,38,38,0.4)"}}>
+                <FileDown size={18}/> Print / Simpan PDF
+              </button>
+              <button onClick={exportJpg} disabled={exportingJpg} style={{width:"100%", padding:"13px", borderRadius:14, border:`2px solid ${C.pri}`, background: exportingJpg ? C.borderL : "#fff", color: exportingJpg ? C.textM : C.pri, fontSize:13, fontWeight:800, cursor: exportingJpg ? "not-allowed" : "pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8, transition:"all .2s", opacity: exportingJpg ? 0.7 : 1}}>
+                <ImageDown size={16}/> {exportingJpg ? "Mengekspor..." : "Export JPG"}
               </button>
             </div>
           </>

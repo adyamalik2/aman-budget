@@ -8,13 +8,13 @@ import { C } from "../constants/theme";
 
 const card = {background:"#fff", borderRadius:16, padding:"14px 16px", border:`1px solid ${C.borderL}`, boxShadow:"0 1px 4px rgba(0,0,0,0.03)"};
 
-const MoreScreen = ({setSubPage, openUpgrade, onLogout, onExportBackup, onImportBackup}) => {
+const MoreScreen = ({setSubPage, openUpgrade, isPro = false, onLogout, onExportBackup, onImportBackup}) => {
   const items = [
     {icon:ArrowRightLeft, label:"Transfer Planner", desc:"Alokasi per anggota keluarga", action:()=>setSubPage("transfer"), color:C.blue},
     {icon:Calculator, label:"Kalkulator Zakat", desc:"Hitung zakat penghasilan 2.5%", action:()=>setSubPage("zakat"), color:C.pri},
     {icon:Users, label:"Family Sync", desc:"Sync data dengan pasangan", pro:true, color:"#ec4899"},
     {icon:Bell, label:"Reminder Tagihan", desc:"Notif jatuh tempo otomatis", pro:true, color:C.gold},
-    {icon:FileDown, label:"Export Laporan", desc:"PDF & Excel untuk arsip", pro:true, color:"#8b5cf6"},
+    {icon:FileDown, label:"Export Laporan", desc:"PDF & Excel untuk arsip", pro:true, color:"#8b5cf6", action: isPro ? ()=>setSubPage("share") : null},
     {icon:Receipt, label:"OCR Struk", desc:"Scan struk otomatis", pro:true, color:"#06b6d4"},
   ];
   const backupBtnStyle = {
