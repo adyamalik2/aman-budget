@@ -10,12 +10,25 @@ const inp = {width:"100%", border:`1.5px solid ${C.border}`, borderRadius:12, pa
 const lbl = {fontSize:12, fontWeight:600, color:C.textM, display:"block", marginBottom:6};
 
 const emptyForm = {name:"", type:"Bank", active:true};
+const normalizeName = value => (value || "").trim().toLowerCase();
 
-const AccountsScreen = ({accounts = [], onAccountsChange, setSubPage}) => {
+const AccountsScreen = ({accounts = [], txs = [], onAccountsChange, setSubPage}) => {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [err, setErr] = useState("");
+  const sortedAccounts = [...accounts].sort((a,b)=>{
+    if((a.active === false) !== (b.active === false)) return a.active === false ? 1 : -1;
+    return (a.name || "").localeCompare(b.name || "");
+  });
+  const isAccountUsed = account => txs.some(tx=>normalizeName(tx.acc) === normalizeName(account.name));
+
+  const closeSheet = () => {
+    setSheetOpen(false);
+    setEditingId(null);
+    setForm(emptyForm);
+    setErr("");
+  };
 
   const openAdd = () => {
     setEditingId(null);
@@ -33,24 +46,38 @@ const AccountsScreen = ({accounts = [], onAccountsChange, setSubPage}) => {
 
   const save = () => {
     const name = form.name.trim();
+    const type = form.type.trim();
     if(!name) {
       setErr("Nama rekening wajib diisi.");
+      return;
+    }
+    if(!type || !accountTypes.includes(type)) {
+      setErr("Jenis rekening wajib dipilih.");
+      return;
+    }
+    if(accounts.some(account => account.id !== editingId && normalizeName(account.name) === normalizeName(name))) {
+      setErr("Nama rekening sudah ada.");
       return;
     }
     const nextAccount = {
       id: editingId || `acc-${Date.now()}`,
       name,
-      type: form.type,
+      type,
       active: form.active !== false,
     };
     const next = editingId
       ? accounts.map(account => account.id === editingId ? nextAccount : account)
       : [...accounts, nextAccount];
     onAccountsChange(next);
-    setSheetOpen(false);
+    closeSheet();
   };
 
   const removeAccount = account => {
+    if(isAccountUsed(account)) {
+      onAccountsChange(accounts.map(item => item.id === account.id ? {...item, active:false} : item));
+      alert(`Rekening ${account.name} pernah dipakai transaksi. Rekening dinonaktifkan, transaksi lama tetap aman.`);
+      return;
+    }
     if(window.confirm(`Hapus rekening ${account.name}? Transaksi lama tetap menyimpan nama rekening lama.`)) {
       onAccountsChange(accounts.filter(item => item.id !== account.id));
     }
@@ -74,6 +101,10 @@ const AccountsScreen = ({accounts = [], onAccountsChange, setSubPage}) => {
       />
 
       <div style={{padding:"14px", display:"flex", flexDirection:"column", gap:12}}>
+        <div style={{...card, background:C.priBg}}>
+          <p style={{fontSize:11, color:C.priD, margin:0, lineHeight:1.45}}>Data nonaktif tidak muncul di pilihan transaksi baru, tetapi transaksi lama tetap aman.</p>
+        </div>
+
         {accounts.length === 0 && (
           <div style={{...card, textAlign:"center", padding:"28px 16px"}}>
             <div style={{width:46, height:46, borderRadius:14, background:C.priL, color:C.pri, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 10px"}}>
@@ -84,7 +115,9 @@ const AccountsScreen = ({accounts = [], onAccountsChange, setSubPage}) => {
           </div>
         )}
 
-        {accounts.map(account => (
+        {sortedAccounts.map(account => {
+          const used = isAccountUsed(account);
+          return (
           <div key={account.id} style={card}>
             <div style={{display:"flex", alignItems:"center", gap:12}}>
               <div style={{width:42, height:42, borderRadius:13, background:C.priL, color:C.pri, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0}}>
@@ -106,11 +139,12 @@ const AccountsScreen = ({accounts = [], onAccountsChange, setSubPage}) => {
                 {account.active === false ? "Aktifkan" : "Nonaktifkan"}
               </button>
               <button type="button" onClick={()=>removeAccount(account)} style={{border:`1px solid ${C.redL}`, borderRadius:10, background:"#fff", color:C.red, padding:"9px", fontSize:11, fontWeight:800, display:"flex", alignItems:"center", justifyContent:"center", gap:5, cursor:"pointer"}}>
-                <Trash2 size={13}/> Hapus
+                <Trash2 size={13}/> {used ? "Nonaktifkan" : "Hapus"}
               </button>
             </div>
           </div>
-        ))}
+          );
+        })}
 
         <button type="button" onClick={openAdd} style={{background:C.pri, color:"#fff", border:"none", borderRadius:14, padding:"14px", fontSize:14, fontWeight:800, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8, boxShadow:"0 6px 18px rgba(22,163,74,0.22)"}}>
           <Plus size={17}/> Tambah Rekening
@@ -122,11 +156,11 @@ const AccountsScreen = ({accounts = [], onAccountsChange, setSubPage}) => {
           <div style={{width:"100%", maxWidth:430, background:"#fff", borderTopLeftRadius:24, borderTopRightRadius:24, maxHeight:"88vh", overflowY:"auto", animation:"slideUp 0.3s"}}>
             <div style={{padding:"16px", borderBottom:`1px solid ${C.borderL}`, display:"flex", alignItems:"center", justifyContent:"space-between"}}>
               <p style={{fontSize:16, fontWeight:800, color:C.text, margin:0}}>{editingId ? "Edit Rekening" : "Tambah Rekening"}</p>
-              <button type="button" onClick={()=>setSheetOpen(false)} aria-label="Tutup form rekening" style={{background:C.borderL, border:"none", borderRadius:10, padding:8, cursor:"pointer", display:"flex"}}>
+              <button type="button" onClick={closeSheet} aria-label="Tutup form rekening" style={{background:C.borderL, border:"none", borderRadius:10, padding:8, cursor:"pointer", display:"flex"}}>
                 <X size={16} color={C.textM}/>
               </button>
             </div>
-            <div style={{padding:"14px 14px calc(24px + env(safe-area-inset-bottom))", display:"flex", flexDirection:"column", gap:14}}>
+            <div style={{padding:"14px 14px calc(32px + env(safe-area-inset-bottom))", display:"flex", flexDirection:"column", gap:14}}>
               <div>
                 <label style={lbl}>Nama Rekening</label>
                 <input style={{...inp, borderColor:err?C.red:C.border}} value={form.name} onChange={e=>{setForm(p=>({...p, name:e.target.value})); setErr("");}} placeholder="BSI, BCA, Cash, Dana"/>

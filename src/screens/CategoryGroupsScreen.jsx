@@ -8,19 +8,36 @@ const card = {background:"#fff", borderRadius:16, padding:"14px 16px", border:`1
 const inp = {width:"100%", border:`1.5px solid ${C.border}`, borderRadius:12, padding:"11px 14px", fontSize:14, outline:"none", boxSizing:"border-box", background:"#fff", color:C.text};
 const lbl = {fontSize:12, fontWeight:600, color:C.textM, display:"block", marginBottom:6};
 const groupColors = ["#16a34a","#2563eb","#d97706","#dc2626","#7c3aed","#0891b2","#ec4899","#f97316"];
+const normalizeName = value => (value || "").trim().toLowerCase();
 
 const slugify = value => {
   const slug = value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
   return slug || `grup_${Date.now()}`;
 };
 
-const CategoryGroupsScreen = ({categoryGroups = [], onCategoryGroupsChange, setSubPage}) => {
+const CategoryGroupsScreen = ({categoryGroups = [], txs = [], onCategoryGroupsChange, setSubPage}) => {
   const [groupSheet, setGroupSheet] = useState(null);
   const [categorySheet, setCategorySheet] = useState(null);
   const [err, setErr] = useState("");
+  const sortedGroups = [...categoryGroups].sort((a,b)=>{
+    if((a.active === false) !== (b.active === false)) return a.active === false ? 1 : -1;
+    return (a.label || "").localeCompare(b.label || "");
+  });
+  const isGroupUsed = group => txs.some(tx=>tx.grp === group.id);
+  const isCategoryUsed = (group, category) => txs.some(tx=>tx.grp === group.id && normalizeName(tx.cat) === normalizeName(category.name));
 
   const updateGroup = (groupId, updater) => {
     onCategoryGroupsChange(categoryGroups.map(group => group.id === groupId ? updater(group) : group));
+  };
+
+  const closeGroupSheet = () => {
+    setGroupSheet(null);
+    setErr("");
+  };
+
+  const closeCategorySheet = () => {
+    setCategorySheet(null);
+    setErr("");
   };
 
   const openAddGroup = () => {
@@ -39,6 +56,10 @@ const CategoryGroupsScreen = ({categoryGroups = [], onCategoryGroupsChange, setS
       setErr("Nama grup wajib diisi.");
       return;
     }
+    if(categoryGroups.some(group => group.id !== groupSheet.id && normalizeName(group.label) === normalizeName(label))) {
+      setErr("Nama grup sudah ada.");
+      return;
+    }
     if(groupSheet.id) {
       onCategoryGroupsChange(categoryGroups.map(group => group.id === groupSheet.id ? {...group, label, active:groupSheet.active !== false} : group));
     } else {
@@ -50,10 +71,15 @@ const CategoryGroupsScreen = ({categoryGroups = [], onCategoryGroupsChange, setS
         {id, label, color:groupColors[categoryGroups.length % groupColors.length], active:groupSheet.active !== false, categories:[]},
       ]);
     }
-    setGroupSheet(null);
+    closeGroupSheet();
   };
 
   const removeGroup = group => {
+    if(isGroupUsed(group)) {
+      updateGroup(group.id, item => ({...item, active:false}));
+      alert(`Grup ${group.label} pernah dipakai transaksi. Grup dinonaktifkan, transaksi lama tetap aman.`);
+      return;
+    }
     if(window.confirm(`Hapus grup ${group.label}? Transaksi lama tetap menyimpan key grup lama.`)) {
       onCategoryGroupsChange(categoryGroups.filter(item => item.id !== group.id));
     }
@@ -79,6 +105,12 @@ const CategoryGroupsScreen = ({categoryGroups = [], onCategoryGroupsChange, setS
       setErr("Nama kategori wajib diisi.");
       return;
     }
+    const group = categoryGroups.find(item => item.id === categorySheet.groupId);
+    const categories = Array.isArray(group?.categories) ? group.categories : [];
+    if(categories.some(category => category.id !== categorySheet.id && normalizeName(category.name) === normalizeName(name))) {
+      setErr("Nama kategori sudah ada di grup ini.");
+      return;
+    }
     updateGroup(categorySheet.groupId, group => {
       const categories = Array.isArray(group.categories) ? group.categories : [];
       if(categorySheet.id) {
@@ -92,10 +124,18 @@ const CategoryGroupsScreen = ({categoryGroups = [], onCategoryGroupsChange, setS
         categories: [...categories, {id:`cat-${Date.now()}`, name, active:categorySheet.active !== false}],
       };
     });
-    setCategorySheet(null);
+    closeCategorySheet();
   };
 
   const removeCategory = (group, category) => {
+    if(isCategoryUsed(group, category)) {
+      updateGroup(group.id, item => ({
+        ...item,
+        categories: (item.categories || []).map(cat => cat.id === category.id ? {...cat, active:false} : cat),
+      }));
+      alert(`Kategori ${category.name} pernah dipakai transaksi. Kategori dinonaktifkan, transaksi lama tetap aman.`);
+      return;
+    }
     if(window.confirm(`Hapus kategori ${category.name}? Transaksi lama tetap menyimpan teks kategori lama.`)) {
       updateGroup(group.id, item => ({
         ...item,
@@ -127,6 +167,10 @@ const CategoryGroupsScreen = ({categoryGroups = [], onCategoryGroupsChange, setS
       />
 
       <div style={{padding:"14px", display:"flex", flexDirection:"column", gap:12}}>
+        <div style={{...card, background:C.priBg}}>
+          <p style={{fontSize:11, color:C.priD, margin:0, lineHeight:1.45}}>Data nonaktif tidak muncul di pilihan transaksi baru, tetapi transaksi lama tetap aman.</p>
+        </div>
+
         {categoryGroups.length === 0 && (
           <div style={{...card, textAlign:"center", padding:"28px 16px"}}>
             <div style={{width:46, height:46, borderRadius:14, background:C.priL, color:C.pri, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 10px"}}>
@@ -137,8 +181,12 @@ const CategoryGroupsScreen = ({categoryGroups = [], onCategoryGroupsChange, setS
           </div>
         )}
 
-        {categoryGroups.map(group => {
-          const categories = Array.isArray(group.categories) ? group.categories : [];
+        {sortedGroups.map(group => {
+          const categories = (Array.isArray(group.categories) ? [...group.categories] : []).sort((a,b)=>{
+            if((a.active === false) !== (b.active === false)) return a.active === false ? 1 : -1;
+            return (a.name || "").localeCompare(b.name || "");
+          });
+          const groupUsed = isGroupUsed(group);
           return (
             <div key={group.id} style={card}>
               <div style={{display:"flex", alignItems:"center", gap:12}}>
@@ -156,7 +204,9 @@ const CategoryGroupsScreen = ({categoryGroups = [], onCategoryGroupsChange, setS
 
               <div style={{display:"flex", gap:6, flexWrap:"wrap", marginTop:12}}>
                 {categories.length === 0 && <span style={{fontSize:11, color:C.textL}}>Belum ada kategori.</span>}
-                {categories.map(category => (
+                {categories.map(category => {
+                  const categoryUsed = isCategoryUsed(group, category);
+                  return (
                   <div key={category.id} style={{display:"flex", alignItems:"center", gap:5, border:`1px solid ${category.active === false ? C.borderL : C.border}`, borderRadius:999, padding:"5px 7px", background:category.active === false ? C.borderL : "#fff"}}>
                     <Tag size={11} color={category.active === false ? C.textL : group.color || C.pri}/>
                     <span style={{fontSize:11, fontWeight:700, color:category.active === false ? C.textL : C.text}}>{category.name}</span>
@@ -166,11 +216,12 @@ const CategoryGroupsScreen = ({categoryGroups = [], onCategoryGroupsChange, setS
                     <button type="button" onClick={()=>toggleCategory(group, category)} style={{border:"none", background:"transparent", padding:0, color:category.active === false ? C.pri : C.gold, fontSize:10, fontWeight:800, cursor:"pointer"}}>
                       {category.active === false ? "ON" : "OFF"}
                     </button>
-                    <button type="button" onClick={()=>removeCategory(group, category)} aria-label={`Hapus ${category.name}`} style={{border:"none", background:"transparent", padding:0, color:C.red, display:"flex", cursor:"pointer"}}>
+                    <button type="button" onClick={()=>removeCategory(group, category)} aria-label={categoryUsed ? `Nonaktifkan ${category.name}` : `Hapus ${category.name}`} style={{border:"none", background:"transparent", padding:0, color:C.red, display:"flex", cursor:"pointer"}}>
                       <X size={12}/>
                     </button>
                   </div>
-                ))}
+                  );
+                })}
               </div>
 
               <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginTop:12}}>
@@ -184,7 +235,7 @@ const CategoryGroupsScreen = ({categoryGroups = [], onCategoryGroupsChange, setS
                   {group.active === false ? "Aktifkan" : "Nonaktifkan"}
                 </button>
                 <button type="button" onClick={()=>removeGroup(group)} style={{border:`1px solid ${C.redL}`, borderRadius:10, background:"#fff", color:C.red, padding:"9px", fontSize:11, fontWeight:800, display:"flex", alignItems:"center", justifyContent:"center", gap:5, cursor:"pointer"}}>
-                  <Trash2 size={13}/> Hapus
+                  <Trash2 size={13}/> {groupUsed ? "Nonaktifkan" : "Hapus"}
                 </button>
               </div>
             </div>
@@ -201,11 +252,11 @@ const CategoryGroupsScreen = ({categoryGroups = [], onCategoryGroupsChange, setS
           <div style={{width:"100%", maxWidth:430, background:"#fff", borderTopLeftRadius:24, borderTopRightRadius:24, maxHeight:"88vh", overflowY:"auto", animation:"slideUp 0.3s"}}>
             <div style={{padding:"16px", borderBottom:`1px solid ${C.borderL}`, display:"flex", alignItems:"center", justifyContent:"space-between"}}>
               <p style={{fontSize:16, fontWeight:800, color:C.text, margin:0}}>{groupSheet.id ? "Edit Grup" : "Tambah Grup"}</p>
-              <button type="button" onClick={()=>setGroupSheet(null)} aria-label="Tutup form grup" style={{background:C.borderL, border:"none", borderRadius:10, padding:8, cursor:"pointer", display:"flex"}}>
+              <button type="button" onClick={closeGroupSheet} aria-label="Tutup form grup" style={{background:C.borderL, border:"none", borderRadius:10, padding:8, cursor:"pointer", display:"flex"}}>
                 <X size={16} color={C.textM}/>
               </button>
             </div>
-            <div style={{padding:"14px 14px calc(24px + env(safe-area-inset-bottom))", display:"flex", flexDirection:"column", gap:14}}>
+            <div style={{padding:"14px 14px calc(32px + env(safe-area-inset-bottom))", display:"flex", flexDirection:"column", gap:14}}>
               <div>
                 <label style={lbl}>Nama Grup</label>
                 <input style={{...inp, borderColor:err?C.red:C.border}} value={groupSheet.label} onChange={e=>{setGroupSheet(p=>({...p, label:e.target.value})); setErr("");}} placeholder="Rumah, Bunda, Ayah"/>
@@ -231,11 +282,11 @@ const CategoryGroupsScreen = ({categoryGroups = [], onCategoryGroupsChange, setS
                 <p style={{fontSize:16, fontWeight:800, color:C.text, margin:0}}>{categorySheet.id ? "Edit Kategori" : "Tambah Kategori"}</p>
                 {selectedGroup && <p style={{fontSize:11, color:C.textM, margin:"2px 0 0"}}>{selectedGroup.label}</p>}
               </div>
-              <button type="button" onClick={()=>setCategorySheet(null)} aria-label="Tutup form kategori" style={{background:C.borderL, border:"none", borderRadius:10, padding:8, cursor:"pointer", display:"flex"}}>
+              <button type="button" onClick={closeCategorySheet} aria-label="Tutup form kategori" style={{background:C.borderL, border:"none", borderRadius:10, padding:8, cursor:"pointer", display:"flex"}}>
                 <X size={16} color={C.textM}/>
               </button>
             </div>
-            <div style={{padding:"14px 14px calc(24px + env(safe-area-inset-bottom))", display:"flex", flexDirection:"column", gap:14}}>
+            <div style={{padding:"14px 14px calc(32px + env(safe-area-inset-bottom))", display:"flex", flexDirection:"column", gap:14}}>
               <div>
                 <label style={lbl}>Nama Kategori</label>
                 <input style={{...inp, borderColor:err?C.red:C.border}} value={categorySheet.name} onChange={e=>{setCategorySheet(p=>({...p, name:e.target.value})); setErr("");}} placeholder="Belanja Bulanan, Zakat, Transportasi"/>

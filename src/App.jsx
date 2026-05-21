@@ -233,8 +233,8 @@ export default function App() {
 
       setTxs(data.transactions.map(tx=>({...tx, amt:Number(tx.amt)})));
       if(data.goals !== undefined) setGoals(data.goals);
-      if(Array.isArray(data.accounts)) setAccounts(data.accounts);
-      if(Array.isArray(data.categoryGroups)) setCategoryGroups(data.categoryGroups);
+      setAccounts(Array.isArray(data.accounts) ? data.accounts : DEFAULT_ACCOUNTS);
+      setCategoryGroups(Array.isArray(data.categoryGroups) ? data.categoryGroups : DEFAULT_CATEGORY_GROUPS);
       if(Object.prototype.hasOwnProperty.call(data, "user")) setUser(data.user);
       if(data.period !== undefined) setPeriod(normalizePeriod(data.period));
       setHasUnsyncedChanges(true);
@@ -339,8 +339,8 @@ export default function App() {
 
       setTxs(restoredTxs.map(tx=>({...tx, amt:Number(tx.amt)})));
       if(Array.isArray(data.goals)) setGoals(data.goals);
-      if(Array.isArray(data.accounts)) setAccounts(data.accounts);
-      if(Array.isArray(data.categoryGroups)) setCategoryGroups(data.categoryGroups);
+      setAccounts(Array.isArray(data.accounts) ? data.accounts : DEFAULT_ACCOUNTS);
+      setCategoryGroups(Array.isArray(data.categoryGroups) ? data.categoryGroups : DEFAULT_CATEGORY_GROUPS);
       if(data.periodSetting !== undefined) setPeriod(normalizePeriod(data.periodSetting));
       else if(data.period !== undefined) setPeriod(normalizePeriod(data.period));
       if(data.user && typeof data.user === "object") setUser(data.user);
@@ -400,8 +400,8 @@ export default function App() {
     if(subPage==="upgrade") return <UpgradeScreen setSubPage={setSubPage} isPro={isPro} onActivatePro={onActivatePro} onDeactivatePro={onDeactivatePro}/>;
     if(subPage==="transfer") return <TransferScreen txs={activeTxs} setSubPage={setSubPage}/>;
     if(subPage==="zakat") return <ZakatScreen setSubPage={setSubPage}/>;
-    if(subPage==="accounts") return <AccountsScreen accounts={accounts} onAccountsChange={onAccountsChange} setSubPage={setSubPage}/>;
-    if(subPage==="category-groups") return <CategoryGroupsScreen categoryGroups={categoryGroups} onCategoryGroupsChange={onCategoryGroupsChange} setSubPage={setSubPage}/>;
+    if(subPage==="accounts") return <AccountsScreen accounts={accounts} txs={txs} onAccountsChange={onAccountsChange} setSubPage={setSubPage}/>;
+    if(subPage==="category-groups") return <CategoryGroupsScreen categoryGroups={categoryGroups} txs={txs} onCategoryGroupsChange={onCategoryGroupsChange} setSubPage={setSubPage}/>;
     if(subPage==="tx-list") return <TxListScreen txs={periodTxs} allTxs={activeTxs} goals={goals} period={period} setPeriod={updatePeriod} years={periodYears} onCopyBudget={onCopyBudget} onDeletePeriod={onDeletePeriod} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} onDelete={onDelete} onDone={onDone}/>;
     if(subPage==="share") return <ShareScreen txs={periodTxs} allTxs={activeTxs} goals={goals} period={period} setSubPage={setSubPage}/>;
     if(tab==="home") return <HomeScreen txs={periodTxs} allTxs={activeTxs} goals={goals} period={period} setPeriod={updatePeriod} years={periodYears} onCopyBudget={onCopyBudget} setTab={setTab} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} openUpgrade={openUpgrade} isPro={isPro} user={appUser} cloudUser={cloudUser} hasUnsyncedChanges={hasUnsyncedChanges} onCloudBackup={onCloudBackup}/>;

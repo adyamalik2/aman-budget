@@ -9,8 +9,8 @@ const lbl = {fontSize:12, fontWeight:600, color:C.textM, display:"block", margin
 const sheetBodyStyle = {padding:"14px 14px calc(24px + env(safe-area-inset-bottom))", display:"flex", flexDirection:"column", gap:14};
 
 const AddSheet = ({editTx, goals = [], accounts = DEFAULT_ACCOUNTS, categoryGroups = DEFAULT_CATEGORY_GROUPS, onSave, onClose}) => {
-  const initialAccount = accounts.find(account=>account?.active !== false && account?.name)?.name || "BSI";
-  const initialGroup = categoryGroups.find(group=>group?.active !== false && group?.id)?.id || "bunda";
+  const initialAccount = accounts.find(account=>account?.active !== false && account?.name)?.name || "";
+  const initialGroup = categoryGroups.find(group=>group?.active !== false && group?.id)?.id || "";
   const [f, setF] = useState(editTx || {date:new Date().toISOString().slice(0,10), type:"expense", grp:initialGroup, cat:"", desc:"", amt:"", status:"estimasi", pay:"transfer", acc:initialAccount, goalId:null});
   const [err, setErr] = useState({});
   const s = (k,v) => setF(p=>({...p, [k]:v}));
@@ -18,11 +18,11 @@ const AddSheet = ({editTx, goals = [], accounts = DEFAULT_ACCOUNTS, categoryGrou
   const accountOptions = accounts
     .filter(account=>account?.active !== false && account?.name)
     .map(account=>account.name);
-  if(f.acc && !accountOptions.includes(f.acc)) accountOptions.push(f.acc);
+  if(editTx?.acc && f.acc && !accountOptions.includes(f.acc)) accountOptions.push(f.acc);
   const groupOptions = categoryGroups
     .filter(group=>group?.active !== false && group?.id)
     .map(group=>({id:group.id, label:group.label || GROUPS[group.id]?.label || group.id}));
-  if(f.grp && !groupOptions.some(group=>group.id === f.grp)) {
+  if(editTx?.grp && f.grp && !groupOptions.some(group=>group.id === f.grp)) {
     groupOptions.push({id:f.grp, label:GROUPS[f.grp]?.label || f.grp});
   }
   const activeCategories = (categoryGroups.find(group=>group.id === f.grp)?.categories || [])
