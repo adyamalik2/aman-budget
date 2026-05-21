@@ -26,8 +26,7 @@ if(isFirebaseConfigured) {
     auth = getAuth(app);
     googleProvider = new GoogleAuthProvider();
     db = getFirestore(app);
-  } catch (error) {
-    console.error("Firebase init failed", error);
+  } catch {
     isFirebaseConfigured = false;
   }
 }

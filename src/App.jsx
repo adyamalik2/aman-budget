@@ -199,6 +199,7 @@ export default function App() {
         accounts,
         categoryGroups,
         user,
+        periodSetting:normalizePeriod(period),
         period:normalizePeriod(period),
       };
       const blob = new Blob([JSON.stringify(backup, null, 2)], {type:"application/json"});
@@ -236,7 +237,8 @@ export default function App() {
       setAccounts(Array.isArray(data.accounts) ? data.accounts : DEFAULT_ACCOUNTS);
       setCategoryGroups(Array.isArray(data.categoryGroups) ? data.categoryGroups : DEFAULT_CATEGORY_GROUPS);
       if(Object.prototype.hasOwnProperty.call(data, "user")) setUser(data.user);
-      if(data.period !== undefined) setPeriod(normalizePeriod(data.period));
+      if(data.periodSetting !== undefined) setPeriod(normalizePeriod(data.periodSetting));
+      else if(data.period !== undefined) setPeriod(normalizePeriod(data.period));
       setHasUnsyncedChanges(true);
       alert("Backup berhasil diimport.");
     } catch {
