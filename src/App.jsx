@@ -18,7 +18,7 @@ import ShareScreen from "./screens/ShareScreen";
 import WelcomeScreen from "./screens/WelcomeScreen";
 import AddSheet from "./features/transactions/AddSheet";
 import { C } from "./constants/theme";
-import { DEFAULT_ACCOUNTS, DEFAULT_CATEGORY_GROUPS, STORAGE_KEYS } from "./constants/app";
+import { DEFAULT_ACCOUNTS, DEFAULT_CATEGORY_GROUPS, DEFAULT_QUICK_SHORTCUTS, STORAGE_KEYS } from "./constants/app";
 import { INIT_GOALS, INIT_TX } from "./data/initialData";
 import { auth, googleProvider, isFirebaseConfigured } from "./lib/firebase";
 import { backupToCloud, restoreFromCloud } from "./lib/cloudBackup";
@@ -48,12 +48,14 @@ export default function App() {
   const [subPage, setSubPage] = useState(null);
   const [addOpen, setAddOpen] = useState(false);
   const [editTx, setEditTx] = useState(null);
+  const [addPreset, setAddPreset] = useState(null);
   const [txs, setTxs] = useState(() => loadStored(STORAGE_KEYS.txs, INIT_TX, Array.isArray));
   const [goals, setGoals] = useState(() => loadStored(STORAGE_KEYS.goals, INIT_GOALS, Array.isArray));
   const [accounts, setAccounts] = useState(() => loadStored(STORAGE_KEYS.accounts, DEFAULT_ACCOUNTS, Array.isArray));
   const [categoryGroups, setCategoryGroups] = useState(() => loadStored(STORAGE_KEYS.categoryGroups, DEFAULT_CATEGORY_GROUPS, Array.isArray));
   const [lastTxDate, setLastTxDate] = useState(() => loadStored(STORAGE_KEYS.lastTxDate, "", v=>typeof v==="string"));
   const [transfers, setTransfers] = useState(() => loadStored(STORAGE_KEYS.transfers, [], Array.isArray));
+  const [quickShortcuts, setQuickShortcuts] = useState(() => loadStored(STORAGE_KEYS.quickShortcuts, DEFAULT_QUICK_SHORTCUTS, Array.isArray));
   const [period, setPeriod] = useState(() => normalizePeriod(loadStored(STORAGE_KEYS.period, getDefaultPeriod(), v=>v&&typeof v==="object"&&!Array.isArray(v))));
   const [isPro, setIsPro] = useState(() => loadStored(STORAGE_KEYS.isPro, false, v=>v===true||v===false));
   const [cloudUser, setCloudUser] = useState(null);
@@ -68,6 +70,7 @@ export default function App() {
   useEffect(()=>{ saveStored(STORAGE_KEYS.categoryGroups, categoryGroups); }, [categoryGroups]);
   useEffect(()=>{ saveStored(STORAGE_KEYS.lastTxDate, lastTxDate); }, [lastTxDate]);
   useEffect(()=>{ saveStored(STORAGE_KEYS.transfers, transfers); }, [transfers]);
+  useEffect(()=>{ saveStored(STORAGE_KEYS.quickShortcuts, quickShortcuts); }, [quickShortcuts]);
   useEffect(()=>{ saveStored(STORAGE_KEYS.period, normalizePeriod(period)); }, [period]);
   useEffect(()=>{ saveStored(STORAGE_KEYS.isPro, isPro); }, [isPro]);
   useEffect(()=>{ saveStored(SKIP_LOGIN_KEY, hasSkippedLogin); }, [hasSkippedLogin]);
@@ -99,9 +102,10 @@ export default function App() {
     accounts,
     categoryGroups,
     transfers,
+    quickShortcuts,
     periodSetting: normalizePeriod(period),
     user: appUser,
-  }), [txs, goals, accounts, categoryGroups, transfers, period, appUser]);
+  }), [txs, goals, accounts, categoryGroups, transfers, quickShortcuts, period, appUser]);
   const onContinueLocal = () => {
     setHasSkippedLogin(true);
     setUser(LOCAL_MODE_USER);
@@ -192,6 +196,27 @@ export default function App() {
     setHasUnsyncedChanges(true);
     setTransfers(prev=>prev.filter(item=>item.id !== id));
   };
+  const onQuickShortcutsChange = nextShortcuts => {
+    setHasUnsyncedChanges(true);
+    setQuickShortcuts(nextShortcuts);
+  };
+  const onOpenShortcut = shortcut => {
+    const accountName = shortcut.accountId
+      ? accounts.find(account=>account.id === shortcut.accountId)?.name || shortcut.account || ""
+      : shortcut.account || "";
+    const preset = {
+      type: shortcut.type === "income" ? "income" : "expense",
+      desc: shortcut.description || shortcut.label || "",
+      status: shortcut.type === "income" ? "selesai" : "estimasi",
+    };
+    if(shortcut.group) preset.grp = shortcut.group;
+    if(shortcut.category) preset.cat = shortcut.category;
+    if(shortcut.amount !== "" && shortcut.amount !== null && shortcut.amount !== undefined) preset.amt = String(shortcut.amount);
+    if(accountName) preset.acc = accountName;
+    setEditTx(null);
+    setAddPreset(preset);
+    setAddOpen(true);
+  };
   const getPeriodDate = activePeriod => {
     const p = normalizePeriod(activePeriod);
     const month = p.mode === "range" ? p.startMonth : p.month;
@@ -277,6 +302,7 @@ export default function App() {
         accounts,
         categoryGroups,
         transfers,
+        quickShortcuts,
         user,
         periodSetting:normalizePeriod(period),
         period:normalizePeriod(period),
@@ -316,6 +342,7 @@ export default function App() {
       setAccounts(Array.isArray(data.accounts) ? data.accounts : DEFAULT_ACCOUNTS);
       setCategoryGroups(Array.isArray(data.categoryGroups) ? data.categoryGroups : DEFAULT_CATEGORY_GROUPS);
       setTransfers(Array.isArray(data.transfers) ? data.transfers : []);
+      setQuickShortcuts(Array.isArray(data.quickShortcuts) ? data.quickShortcuts : DEFAULT_QUICK_SHORTCUTS);
       if(Object.prototype.hasOwnProperty.call(data, "user")) setUser(data.user);
       if(data.periodSetting !== undefined) setPeriod(normalizePeriod(data.periodSetting));
       else if(data.period !== undefined) setPeriod(normalizePeriod(data.period));
@@ -424,6 +451,7 @@ export default function App() {
       setAccounts(Array.isArray(data.accounts) ? data.accounts : DEFAULT_ACCOUNTS);
       setCategoryGroups(Array.isArray(data.categoryGroups) ? data.categoryGroups : DEFAULT_CATEGORY_GROUPS);
       setTransfers(Array.isArray(data.transfers) ? data.transfers : []);
+      setQuickShortcuts(Array.isArray(data.quickShortcuts) ? data.quickShortcuts : DEFAULT_QUICK_SHORTCUTS);
       if(data.periodSetting !== undefined) setPeriod(normalizePeriod(data.periodSetting));
       else if(data.period !== undefined) setPeriod(normalizePeriod(data.period));
       if(data.user && typeof data.user === "object") setUser(data.user);
@@ -452,6 +480,7 @@ export default function App() {
         if(addOpen) {
           setAddOpen(false);
           setEditTx(null);
+          setAddPreset(null);
           return;
         }
         if(subPage) {
@@ -485,9 +514,9 @@ export default function App() {
     if(subPage==="zakat") return <ZakatScreen setSubPage={setSubPage} onAddZakatBudget={onAddZakatBudget}/>;
     if(subPage==="accounts") return <AccountsScreen accounts={accounts} txs={txs} onAccountsChange={onAccountsChange} setSubPage={setSubPage}/>;
     if(subPage==="category-groups") return <CategoryGroupsScreen categoryGroups={categoryGroups} txs={txs} onCategoryGroupsChange={onCategoryGroupsChange} setSubPage={setSubPage}/>;
-    if(subPage==="tx-list") return <TxListScreen txs={periodTxs} allTxs={activeTxs} goals={goals} period={period} setPeriod={updatePeriod} years={periodYears} onCopyBudget={onCopyBudget} onDeletePeriod={onDeletePeriod} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} onDelete={onDelete} onDone={onDone} onCopy={onCopyTx}/>;
+    if(subPage==="tx-list") return <TxListScreen txs={periodTxs} allTxs={activeTxs} goals={goals} period={period} setPeriod={updatePeriod} years={periodYears} onCopyBudget={onCopyBudget} onDeletePeriod={onDeletePeriod} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={(open)=>{if(open) setAddPreset(null); setAddOpen(open);}} onDelete={onDelete} onDone={onDone} onCopy={onCopyTx}/>;
     if(subPage==="share") return <ShareScreen txs={periodTxs} allTxs={activeTxs} goals={goals} period={period} categoryGroups={categoryGroups} setSubPage={setSubPage}/>;
-    if(tab==="home") return <HomeScreen txs={periodTxs} allTxs={activeTxs} goals={goals} period={period} setPeriod={updatePeriod} years={periodYears} onCopyBudget={onCopyBudget} setTab={setTab} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} openUpgrade={openUpgrade} isPro={isPro} user={appUser} cloudUser={cloudUser} hasUnsyncedChanges={hasUnsyncedChanges} onCloudBackup={onCloudBackup}/>;
+    if(tab==="home") return <HomeScreen txs={periodTxs} allTxs={activeTxs} goals={goals} period={period} setPeriod={updatePeriod} years={periodYears} onCopyBudget={onCopyBudget} setTab={setTab} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={(open)=>{if(open) setAddPreset(null); setAddOpen(open);}} quickShortcuts={quickShortcuts} accounts={accounts} categoryGroups={categoryGroups} onOpenShortcut={onOpenShortcut} onQuickShortcutsChange={onQuickShortcutsChange} openUpgrade={openUpgrade} isPro={isPro} user={appUser} cloudUser={cloudUser} hasUnsyncedChanges={hasUnsyncedChanges} onCloudBackup={onCloudBackup}/>;
     if(tab==="reports") return <ReportsScreen txs={periodTxs} period={period} setPeriod={updatePeriod} years={periodYears} openUpgrade={openUpgrade}/>;
     if(tab==="goals-tab") return <GoalsScreen goals={goals} txs={activeTxs} isPro={isPro} openUpgrade={openUpgrade} onAddSaving={onAddGoalSaving} onAddGoal={onAddGoal} onEditGoal={onEditGoal} onDeleteGoal={onDeleteGoal}/>;
     if(tab==="more") return <MoreScreen setSubPage={setSubPage} openUpgrade={openUpgrade} isPro={isPro} onLogout={onLocalLogout} onExportBackup={onExportBackup} onImportBackup={onImportBackup} cloudUser={cloudUser} cloudBusy={cloudBusy} hasUnsyncedChanges={hasUnsyncedChanges} onCloudLogin={onCloudLogin} onCloudLogout={onCloudLogout} onCloudBackup={onCloudBackup} onCloudRestore={onCloudRestore} deletedTxs={deletedTxs} onRestoreTx={onRestoreTx} onPermanentDeleteTx={onPermanentDeleteTx}/>;
@@ -507,8 +536,8 @@ export default function App() {
       `}</style>
       <div style={{width:"100%", maxWidth:430, display:"flex", flexDirection:"column", minHeight:"100vh", position:"relative", background:C.bg}}>
         {renderScreen()}
-        {!hideNav && <BottomNav tab={tab} setTab={(t)=>{setTab(t); setSubPage(null);}} setAddOpen={setAddOpen} setEditTx={setEditTx}/>}
-        {addOpen && <AddSheet editTx={editTx} goals={goals} accounts={accounts} categoryGroups={categoryGroups} lastTxDate={lastTxDate} onSave={onSave} onClose={()=>{setAddOpen(false); setEditTx(null);}}/>}
+        {!hideNav && <BottomNav tab={tab} setTab={(t)=>{setTab(t); setSubPage(null);}} setAddOpen={(open)=>{if(open) setAddPreset(null); setAddOpen(open);}} setEditTx={setEditTx}/>}
+        {addOpen && <AddSheet editTx={editTx} initialData={addPreset} goals={goals} accounts={accounts} categoryGroups={categoryGroups} lastTxDate={lastTxDate} onSave={onSave} onClose={()=>{setAddOpen(false); setEditTx(null); setAddPreset(null);}}/>}
       </div>
     </div>
   );

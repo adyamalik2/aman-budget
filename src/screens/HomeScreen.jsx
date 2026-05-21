@@ -1,17 +1,26 @@
+import { useMemo, useState } from "react";
 import {
+  ArrowDown,
   ArrowRightLeft,
+  ArrowUp,
   Bell,
   Calculator,
+  Check,
   ChevronRight,
   Clock,
   CloudOff,
   CloudCheck,
   Crown,
   FileDown,
+  Pencil,
+  Plus,
   Receipt,
+  Settings,
   Target,
   TrendingDown,
   TrendingUp,
+  Trash2,
+  X,
 } from "lucide-react";
 import PeriodPicker from "../components/period/PeriodPicker";
 import { GROUPS } from "../constants/app";
@@ -22,8 +31,25 @@ import { calcGroups, calcSummary } from "../utils/summary";
 import { getGoalDisplayedSaved } from "../utils/goals";
 
 const card = {background:"#fff", borderRadius:16, padding:"14px 16px", border:`1px solid ${C.borderL}`, boxShadow:"0 1px 4px rgba(0,0,0,0.03)"};
+const inp = {width:"100%", border:`1.5px solid ${C.border}`, borderRadius:12, padding:"11px 14px", fontSize:14, outline:"none", boxSizing:"border-box", background:"#fff", color:C.text};
+const lbl = {fontSize:12, fontWeight:600, color:C.textM, display:"block", marginBottom:6};
 
-const HomeScreen = ({txs, allTxs = [], goals = [], period, setPeriod, years, onCopyBudget, setTab, setSubPage, setEditTx, setAddOpen, openUpgrade, isPro = false, user, cloudUser = null, hasUnsyncedChanges = false, onCloudBackup}) => {
+const newShortcutForm = group => ({
+  id:null,
+  label:"",
+  type:"expense",
+  group,
+  category:"",
+  description:"",
+  amount:"",
+  account:"",
+  isActive:true,
+});
+
+const HomeScreen = ({txs, allTxs = [], goals = [], period, setPeriod, years, onCopyBudget, setTab, setSubPage, setEditTx, setAddOpen, quickShortcuts = [], accounts = [], categoryGroups = [], onOpenShortcut, onQuickShortcutsChange, openUpgrade, isPro = false, user, cloudUser = null, hasUnsyncedChanges = false, onCloudBackup}) => {
+  const [shortcutSheetOpen, setShortcutSheetOpen] = useState(false);
+  const [shortcutForm, setShortcutForm] = useState(null);
+  const [shortcutErr, setShortcutErr] = useState({});
   const s = calcSummary(txs);
   const grps = calcGroups(txs);
   const cloudMeta = !cloudUser
@@ -56,6 +82,102 @@ const HomeScreen = ({txs, allTxs = [], goals = [], period, setPeriod, years, onC
   const recent = [...txs].sort((a,b)=>b.date.localeCompare(a.date)).slice(0, 4);
   const periodMode = normalizePeriod(period).mode;
   const periodLabel = formatPeriodLabel(period);
+  const activeGroupOptions = categoryGroups
+    .filter(group=>group?.active !== false && group?.id)
+    .map(group=>({id:group.id, label:group.label || GROUPS[group.id]?.label || group.id}));
+  const accountOptions = accounts.filter(account=>account?.active !== false && account?.name).map(account=>account.name);
+  const shortcutRows = useMemo(() => [...quickShortcuts].sort((a,b)=>{
+    const activeA = a.isActive !== false;
+    const activeB = b.isActive !== false;
+    if(activeA !== activeB) return activeA ? -1 : 1;
+    return Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0);
+  }), [quickShortcuts]);
+  const activeShortcuts = shortcutRows.filter(shortcut=>shortcut.isActive !== false);
+  const shortcutGroup = categoryGroups.find(group=>group.id === shortcutForm?.group);
+  const shortcutCategories = (shortcutGroup?.categories || []).filter(category=>category?.active !== false && category?.name);
+  const resetShortcutForm = () => {
+    setShortcutForm(null);
+    setShortcutErr({});
+  };
+  const openNewShortcut = () => {
+    setShortcutForm(newShortcutForm(activeGroupOptions[0]?.id || ""));
+    setShortcutErr({});
+  };
+  const openEditShortcut = shortcut => {
+    setShortcutForm({
+      id:shortcut.id,
+      label:shortcut.label || "",
+      type:shortcut.type === "income" ? "income" : "expense",
+      group:shortcut.group || activeGroupOptions[0]?.id || "",
+      category:shortcut.category || "",
+      description:shortcut.description || "",
+      amount:shortcut.amount ?? "",
+      account:shortcut.account || "",
+      isActive:shortcut.isActive !== false,
+    });
+    setShortcutErr({});
+  };
+  const saveShortcut = () => {
+    const label = shortcutForm?.label?.trim() || "";
+    const description = shortcutForm?.description?.trim() || "";
+    const category = shortcutForm?.category?.trim() || "";
+    const amountText = String(shortcutForm?.amount ?? "").trim();
+    const errors = {};
+    let amount = "";
+    if(!label) errors.label = "Label wajib diisi.";
+    if(quickShortcuts.some(item=>item.id !== shortcutForm?.id && (item.label || "").trim().toLowerCase() === label.toLowerCase())) {
+      errors.label = "Label shortcut sudah ada.";
+    }
+    if(amountText) {
+      const amountNumber = Number(amountText);
+      if(!Number.isFinite(amountNumber) || amountNumber <= 0) errors.amount = "Nominal harus lebih dari 0 atau kosongkan.";
+      else amount = amountNumber;
+    }
+    if(Object.keys(errors).length) {
+      setShortcutErr(errors);
+      return;
+    }
+    const now = new Date().toISOString();
+    const existing = quickShortcuts.find(item=>item.id === shortcutForm.id);
+    const nextShortcut = {
+      ...(existing || {}),
+      id:existing?.id || `shortcut-${Date.now()}`,
+      label,
+      type:shortcutForm.type === "income" ? "income" : "expense",
+      group:shortcutForm.group || "",
+      category,
+      description,
+      amount,
+      account:shortcutForm.account || "",
+      sortOrder:Number.isFinite(Number(existing?.sortOrder)) ? Number(existing.sortOrder) : quickShortcuts.length,
+      isActive:shortcutForm.isActive !== false,
+      createdAt:existing?.createdAt || now,
+      updatedAt:now,
+    };
+    const next = existing
+      ? quickShortcuts.map(item=>item.id === existing.id ? nextShortcut : item)
+      : [...quickShortcuts, nextShortcut];
+    onQuickShortcutsChange?.(next);
+    resetShortcutForm();
+  };
+  const toggleShortcut = shortcut => {
+    const now = new Date().toISOString();
+    onQuickShortcutsChange?.(quickShortcuts.map(item=>item.id === shortcut.id ? {...item, isActive:item.isActive === false, updatedAt:now} : item));
+  };
+  const deleteShortcut = shortcut => {
+    if(window.confirm(`Hapus shortcut "${shortcut.label}"?`)) {
+      onQuickShortcutsChange?.(quickShortcuts.filter(item=>item.id !== shortcut.id).map((item, index)=>({...item, sortOrder:index})));
+      if(shortcutForm?.id === shortcut.id) resetShortcutForm();
+    }
+  };
+  const moveShortcut = (shortcut, direction) => {
+    const list = [...shortcutRows];
+    const index = list.findIndex(item=>item.id === shortcut.id);
+    const target = index + direction;
+    if(index < 0 || target < 0 || target >= list.length) return;
+    [list[index], list[target]] = [list[target], list[index]];
+    onQuickShortcutsChange?.(list.map((item, order)=>({...item, sortOrder:order})));
+  };
 
   return (
     <div style={{flex:1, overflowY:"auto", paddingBottom:92, background:C.bg}}>
@@ -121,6 +243,40 @@ const HomeScreen = ({txs, allTxs = [], goals = [], period, setPeriod, years, onC
               <span style={{fontSize:10, fontWeight:600, color:C.textM}}>{q.label}</span>
             </button>
           ))}
+        </div>
+
+        {/* Quick transaction shortcuts */}
+        <div style={card}>
+          <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10}}>
+            <p style={{fontSize:13, fontWeight:700, color:C.text, margin:0}}>Transaksi Cepat</p>
+            <button type="button" onClick={()=>{setShortcutSheetOpen(true); resetShortcutForm();}} style={{background:"none", border:"none", color:C.pri, fontSize:11, fontWeight:800, cursor:"pointer", display:"flex", alignItems:"center", gap:4}}>
+              <Settings size={13}/> Atur
+            </button>
+          </div>
+          {activeShortcuts.length > 0 ? (
+            <div style={{display:"grid", gridTemplateColumns:"repeat(2, minmax(0, 1fr))", gap:8}}>
+              {activeShortcuts.slice(0, 6).map(shortcut => {
+                const groupColor = GROUPS[shortcut.group]?.color || C.pri;
+                return (
+                  <button key={shortcut.id} type="button" onClick={()=>onOpenShortcut?.(shortcut)} style={{border:`1px solid ${C.borderL}`, borderRadius:14, background:"#fff", padding:"10px", cursor:"pointer", textAlign:"left", minHeight:64}}>
+                    <div style={{display:"flex", alignItems:"center", gap:8}}>
+                      <div style={{width:30, height:30, borderRadius:10, background:groupColor+"15", color:groupColor, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0}}>
+                        <Plus size={16}/>
+                      </div>
+                      <div style={{minWidth:0}}>
+                        <p style={{fontSize:12, fontWeight:800, color:C.text, margin:0, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>{shortcut.label}</p>
+                        <p style={{fontSize:10, color:C.textL, margin:"2px 0 0", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>{shortcut.category || (shortcut.type === "income" ? "Pemasukan" : GROUPS[shortcut.group]?.label || "Pengeluaran")}</p>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <button type="button" onClick={()=>{setShortcutSheetOpen(true); openNewShortcut();}} style={{width:"100%", border:`1px dashed ${C.border}`, borderRadius:14, background:C.bg, padding:"14px", color:C.textM, fontSize:12, fontWeight:700, cursor:"pointer"}}>
+              Tambah shortcut transaksi harian
+            </button>
+          )}
         </div>
 
         {/* Goals summary card */}
@@ -249,6 +405,136 @@ const HomeScreen = ({txs, allTxs = [], goals = [], period, setPeriod, years, onC
           ))}
         </div>
       </div>
+
+      {shortcutSheetOpen && (
+        <div style={{position:"fixed", inset:0, background:"rgba(15,23,42,0.45)", zIndex:120, display:"flex", alignItems:"flex-end", justifyContent:"center"}}>
+          <div style={{width:"100%", maxWidth:430, background:"#fff", borderTopLeftRadius:24, borderTopRightRadius:24, maxHeight:"90vh", overflowY:"auto", animation:"slideUp 0.3s"}}>
+            <div style={{padding:"16px", borderBottom:`1px solid ${C.borderL}`, position:"sticky", top:0, background:"#fff", zIndex:2, display:"flex", alignItems:"center", justifyContent:"space-between"}}>
+              <div>
+                <p style={{fontSize:16, fontWeight:800, color:C.text, margin:0}}>Shortcut Transaksi</p>
+                <p style={{fontSize:11, color:C.textM, margin:"2px 0 0"}}>Shortcut hanya mengisi form, transaksi tetap disimpan manual.</p>
+              </div>
+              <button type="button" onClick={()=>{setShortcutSheetOpen(false); resetShortcutForm();}} aria-label="Tutup shortcut" style={{background:C.borderL, border:"none", borderRadius:10, padding:8, cursor:"pointer", display:"flex"}}>
+                <X size={16} color={C.textM}/>
+              </button>
+            </div>
+            <div style={{padding:"14px 14px calc(32px + env(safe-area-inset-bottom))", display:"flex", flexDirection:"column", gap:12}}>
+              <button type="button" onClick={openNewShortcut} style={{background:C.pri, color:"#fff", border:"none", borderRadius:14, padding:"13px", fontSize:13, fontWeight:800, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:7}}>
+                <Plus size={16}/> Tambah Shortcut
+              </button>
+
+              {shortcutForm && (
+                <div style={{...card, boxShadow:"none", background:C.bg}}>
+                  <p style={{fontSize:13, fontWeight:800, color:C.text, margin:"0 0 12px"}}>{shortcutForm.id ? "Edit Shortcut" : "Shortcut Baru"}</p>
+                  <div style={{display:"flex", flexDirection:"column", gap:12}}>
+                    <div>
+                      <label style={lbl}>Label Shortcut *</label>
+                      <input style={{...inp, borderColor:shortcutErr.label?C.red:C.border}} value={shortcutForm.label} onChange={e=>setShortcutForm(p=>({...p, label:e.target.value}))} placeholder="Contoh: Dapur"/>
+                      {shortcutErr.label && <p style={{color:C.red, fontSize:11, margin:"4px 0 0"}}>{shortcutErr.label}</p>}
+                    </div>
+                    <div>
+                      <label style={lbl}>Tipe Transaksi</label>
+                      <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:8}}>
+                        {[["expense","Pengeluaran", C.red],["income","Pemasukan", C.pri]].map(([value, label, color])=>(
+                          <button key={value} type="button" onClick={()=>setShortcutForm(p=>({...p, type:value}))} style={{padding:"10px", borderRadius:12, border:`1.5px solid ${shortcutForm.type===value?color:C.border}`, background:shortcutForm.type===value?color+"10":"#fff", color:shortcutForm.type===value?color:C.textM, fontSize:12, fontWeight:800, cursor:"pointer"}}>
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:10}}>
+                      <div>
+                        <label style={lbl}>Grup</label>
+                        <select style={inp} value={shortcutForm.group} onChange={e=>setShortcutForm(p=>({...p, group:e.target.value, category:""}))}>
+                          <option value="">Tanpa grup</option>
+                          {activeGroupOptions.map(group=><option key={group.id} value={group.id}>{group.label}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label style={lbl}>Kategori</label>
+                        <select style={inp} value={shortcutForm.category} onChange={e=>setShortcutForm(p=>({...p, category:e.target.value}))}>
+                          <option value="">Tanpa kategori</option>
+                          {shortcutForm.category && !shortcutCategories.some(category=>category.name === shortcutForm.category) && <option value={shortcutForm.category}>{shortcutForm.category}</option>}
+                          {shortcutCategories.map(category=><option key={category.id || category.name} value={category.name}>{category.name}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label style={lbl}>Deskripsi</label>
+                      <input style={inp} value={shortcutForm.description} onChange={e=>setShortcutForm(p=>({...p, description:e.target.value}))} placeholder="Nama transaksi"/>
+                    </div>
+                    <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:10}}>
+                      <div>
+                        <label style={lbl}>Nominal Default</label>
+                        <input type="number" style={{...inp, borderColor:shortcutErr.amount?C.red:C.border}} value={shortcutForm.amount} onChange={e=>setShortcutForm(p=>({...p, amount:e.target.value}))} placeholder="Kosongkan"/>
+                        {shortcutErr.amount && <p style={{color:C.red, fontSize:11, margin:"4px 0 0"}}>{shortcutErr.amount}</p>}
+                      </div>
+                      <div>
+                        <label style={lbl}>Rekening</label>
+                        <select style={inp} value={shortcutForm.account} onChange={e=>setShortcutForm(p=>({...p, account:e.target.value}))}>
+                          <option value="">Default</option>
+                          {accountOptions.map(account=><option key={account} value={account}>{account}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    <button type="button" onClick={()=>setShortcutForm(p=>({...p, isActive:p.isActive === false}))} style={{padding:"10px", borderRadius:12, border:`1.5px solid ${shortcutForm.isActive!==false?C.pri:C.border}`, background:shortcutForm.isActive!==false?C.priBg:"#fff", color:shortcutForm.isActive!==false?C.priD:C.textM, fontSize:12, fontWeight:800, cursor:"pointer"}}>
+                      {shortcutForm.isActive !== false ? "Aktif" : "Nonaktif"}
+                    </button>
+                    <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:8}}>
+                      <button type="button" onClick={resetShortcutForm} style={{border:`1px solid ${C.border}`, borderRadius:12, background:"#fff", color:C.textM, padding:"12px", fontSize:12, fontWeight:800, cursor:"pointer"}}>Batal</button>
+                      <button type="button" onClick={saveShortcut} style={{border:"none", borderRadius:12, background:C.pri, color:"#fff", padding:"12px", fontSize:12, fontWeight:800, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:6}}>
+                        <Check size={15}/> Simpan
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div style={{display:"flex", flexDirection:"column", gap:8}}>
+                {shortcutRows.length === 0 && (
+                  <div style={{...card, textAlign:"center", boxShadow:"none"}}>
+                    <p style={{fontSize:12, color:C.textM, margin:0}}>Belum ada shortcut.</p>
+                  </div>
+                )}
+                {shortcutRows.map((shortcut, index)=>(
+                  <div key={shortcut.id} style={{...card, boxShadow:"none", padding:"12px"}}>
+                    <div style={{display:"flex", alignItems:"center", gap:10}}>
+                      <div style={{flex:1, minWidth:0}}>
+                        <div style={{display:"flex", alignItems:"center", gap:6, marginBottom:2}}>
+                          <p style={{fontSize:13, fontWeight:800, color:C.text, margin:0, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>{shortcut.label}</p>
+                          <span style={{fontSize:9, fontWeight:800, color:shortcut.isActive!==false?C.priD:C.textM, background:shortcut.isActive!==false?C.priL:C.borderL, borderRadius:999, padding:"3px 7px", flexShrink:0}}>
+                            {shortcut.isActive !== false ? "Aktif" : "Nonaktif"}
+                          </span>
+                        </div>
+                        <p style={{fontSize:10, color:C.textM, margin:0, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>
+                          {shortcut.type === "income" ? "Pemasukan" : GROUPS[shortcut.group]?.label || "Pengeluaran"}{shortcut.category ? ` · ${shortcut.category}` : ""}{shortcut.amount ? ` · ${fmtS(Number(shortcut.amount))}` : ""}
+                        </p>
+                      </div>
+                      <div style={{display:"flex", gap:4, flexWrap:"wrap", justifyContent:"flex-end"}}>
+                        <button type="button" onClick={()=>moveShortcut(shortcut, -1)} disabled={index===0} aria-label="Naik" style={{width:30, height:30, borderRadius:9, border:`1px solid ${C.border}`, background:"#fff", color:index===0?C.textL:C.textM, cursor:index===0?"not-allowed":"pointer", display:"flex", alignItems:"center", justifyContent:"center"}}>
+                          <ArrowUp size={13}/>
+                        </button>
+                        <button type="button" onClick={()=>moveShortcut(shortcut, 1)} disabled={index===shortcutRows.length-1} aria-label="Turun" style={{width:30, height:30, borderRadius:9, border:`1px solid ${C.border}`, background:"#fff", color:index===shortcutRows.length-1?C.textL:C.textM, cursor:index===shortcutRows.length-1?"not-allowed":"pointer", display:"flex", alignItems:"center", justifyContent:"center"}}>
+                          <ArrowDown size={13}/>
+                        </button>
+                        <button type="button" onClick={()=>openEditShortcut(shortcut)} aria-label="Edit" style={{width:30, height:30, borderRadius:9, border:`1px solid ${C.border}`, background:"#fff", color:C.textM, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center"}}>
+                          <Pencil size={13}/>
+                        </button>
+                        <button type="button" onClick={()=>toggleShortcut(shortcut)} aria-label="Aktifkan atau nonaktifkan" style={{width:30, height:30, borderRadius:9, border:`1px solid ${shortcut.isActive!==false?C.goldL:C.priL}`, background:"#fff", color:shortcut.isActive!==false?C.goldD:C.priD, cursor:"pointer", fontSize:10, fontWeight:900}}>
+                          {shortcut.isActive !== false ? "Off" : "On"}
+                        </button>
+                        <button type="button" onClick={()=>deleteShortcut(shortcut)} aria-label="Hapus" style={{width:30, height:30, borderRadius:9, border:`1px solid ${C.redL}`, background:"#fff", color:C.red, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center"}}>
+                          <Trash2 size={13}/>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

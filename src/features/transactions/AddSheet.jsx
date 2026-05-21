@@ -8,11 +8,12 @@ const inp = {width:"100%", border:`1.5px solid ${C.border}`, borderRadius:12, pa
 const lbl = {fontSize:12, fontWeight:600, color:C.textM, display:"block", marginBottom:6};
 const sheetBodyStyle = {padding:"14px 14px calc(24px + env(safe-area-inset-bottom))", display:"flex", flexDirection:"column", gap:14};
 
-const AddSheet = ({editTx, goals = [], accounts = DEFAULT_ACCOUNTS, categoryGroups = DEFAULT_CATEGORY_GROUPS, lastTxDate = "", onSave, onClose}) => {
+const AddSheet = ({editTx, initialData = null, goals = [], accounts = DEFAULT_ACCOUNTS, categoryGroups = DEFAULT_CATEGORY_GROUPS, lastTxDate = "", onSave, onClose}) => {
   const initialAccount = accounts.find(account=>account?.active !== false && account?.name)?.name || "";
   const initialGroup = categoryGroups.find(group=>group?.active !== false && group?.id)?.id || "";
   const initialDate = lastTxDate || new Date().toISOString().slice(0,10);
-  const [f, setF] = useState(editTx || {date:initialDate, type:"expense", grp:initialGroup, cat:"", desc:"", amt:"", status:"estimasi", pay:"transfer", acc:initialAccount, goalId:null});
+  const initialTx = {date:initialDate, type:"expense", grp:initialGroup, cat:"", desc:"", amt:"", status:"estimasi", pay:"transfer", acc:initialAccount, goalId:null, ...(initialData || {})};
+  const [f, setF] = useState(editTx || initialTx);
   const [err, setErr] = useState({});
   const [showCatSuggestions, setShowCatSuggestions] = useState(false);
   const s = (k,v) => setF(p=>({...p, [k]:v}));

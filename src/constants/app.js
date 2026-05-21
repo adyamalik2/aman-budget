@@ -51,6 +51,13 @@ export const DEFAULT_CATEGORY_GROUPS = Object.entries(GROUPS).map(([id, group]) 
   categories: (DEFAULT_GROUP_CATEGORIES[id] || [group.label]).map((name, index) => toCategory(id, name, index)),
 }));
 
+export const DEFAULT_QUICK_SHORTCUTS = [
+  {id:"quick-dapur", label:"Dapur", type:"expense", group:"dapur_makan", category:"Dapur", description:"Dapur", amount:"", account:"", sortOrder:0, isActive:true, createdAt:"", updatedAt:""},
+  {id:"quick-transportasi", label:"Transportasi", type:"expense", group:"transportasi", category:"Transportasi", description:"Transportasi", amount:"", account:"", sortOrder:1, isActive:true, createdAt:"", updatedAt:""},
+  {id:"quick-anak", label:"Anak", type:"expense", group:"anak", category:"Sekolah", description:"Anak", amount:"", account:"", sortOrder:2, isActive:true, createdAt:"", updatedAt:""},
+  {id:"quick-zakat", label:"Zakat", type:"expense", group:"zakat_sedekah", category:"Zakat", description:"Zakat", amount:"", account:"", sortOrder:3, isActive:true, createdAt:"", updatedAt:""},
+];
+
 export const STATUS = {
   estimasi: {label:"Estimasi", bg:"#fef9c3", color:"#854d0e"},
   selesai: {label:"Selesai", bg:"#dcfce7", color:"#166534"},
@@ -72,4 +79,5 @@ export const STORAGE_KEYS = {
   categoryGroups: "amanBudget.categoryGroups",
   lastTxDate: "amanBudget.lastTransactionDate",
   transfers: "amanBudget.transfers",
+  quickShortcuts: "amanBudget.quickShortcuts",
 };
