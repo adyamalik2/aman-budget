@@ -172,6 +172,64 @@ export default function App() {
     setHasUnsyncedChanges(true);
     setCategoryGroups(nextCategoryGroups);
   };
+  const getPeriodDate = activePeriod => {
+    const p = normalizePeriod(activePeriod);
+    const month = p.mode === "range" ? p.startMonth : p.month;
+    const year = p.mode === "range" ? p.startYear : p.year;
+    return `${year}-${String(month).padStart(2, "0")}-01`;
+  };
+  const getZakatGroup = () => {
+    const isZakat = group => `${group?.id || ""} ${group?.label || ""}`.toLowerCase().includes("zakat");
+    return categoryGroups.find(group=>group.active !== false && isZakat(group))
+      || categoryGroups.find(isZakat)
+      || {id:"zakat_sedekah", categories:[{name:"Zakat", active:true}]};
+  };
+  const onAddZakatBudget = amount => {
+    const value = Math.round(Number(amount) || 0);
+    if(value <= 0) {
+      alert("Nominal zakat belum valid.");
+      return;
+    }
+    const now = new Date().toISOString();
+    const group = getZakatGroup();
+    const categories = Array.isArray(group.categories) ? group.categories : [];
+    const category = categories.find(cat=>cat.active !== false && (cat.name || "").toLowerCase().includes("zakat"))
+      || categories.find(cat=>(cat.name || "").toLowerCase().includes("zakat"))
+      || {name:"Zakat"};
+    const account = accounts.find(acc=>acc.active !== false && acc.name)?.name || "";
+    setHasUnsyncedChanges(true);
+    setTxs(prevTxs=>[...prevTxs, {
+      id:`zakat-${Date.now()}`,
+      date:getPeriodDate(period),
+      type:"expense",
+      grp:group.id || "zakat_sedekah",
+      cat:category.name || "Zakat",
+      desc:"Zakat Penghasilan",
+      amt:value,
+      status:"estimasi",
+      pay:"transfer",
+      acc:account,
+      goalId:null,
+      createdAt:now,
+      updatedAt:now,
+    }]);
+    alert("Zakat Penghasilan berhasil ditambahkan ke budget.");
+  };
+  const onCopyTx = tx => {
+    const now = new Date().toISOString();
+    const {id, deletedAt, ...copySource} = tx;
+    void id;
+    void deletedAt;
+    setHasUnsyncedChanges(true);
+    setTxs(prevTxs=>[...prevTxs, {
+      ...copySource,
+      id:`copy-${Date.now()}`,
+      desc:tx.desc ? `${tx.desc} (Copy)` : "Transaksi (Copy)",
+      createdAt:now,
+      updatedAt:now,
+    }]);
+    alert("Transaksi berhasil diduplikasi.");
+  };
   const onCopyBudget = () => {
     const p = normalizePeriod(period);
     if(p.mode !== "month") return;
@@ -401,11 +459,11 @@ export default function App() {
   const renderScreen = () => {
     if(subPage==="upgrade") return <UpgradeScreen setSubPage={setSubPage} isPro={isPro} onActivatePro={onActivatePro} onDeactivatePro={onDeactivatePro}/>;
     if(subPage==="transfer") return <TransferScreen txs={activeTxs} setSubPage={setSubPage}/>;
-    if(subPage==="zakat") return <ZakatScreen setSubPage={setSubPage}/>;
+    if(subPage==="zakat") return <ZakatScreen setSubPage={setSubPage} onAddZakatBudget={onAddZakatBudget}/>;
     if(subPage==="accounts") return <AccountsScreen accounts={accounts} txs={txs} onAccountsChange={onAccountsChange} setSubPage={setSubPage}/>;
     if(subPage==="category-groups") return <CategoryGroupsScreen categoryGroups={categoryGroups} txs={txs} onCategoryGroupsChange={onCategoryGroupsChange} setSubPage={setSubPage}/>;
-    if(subPage==="tx-list") return <TxListScreen txs={periodTxs} allTxs={activeTxs} goals={goals} period={period} setPeriod={updatePeriod} years={periodYears} onCopyBudget={onCopyBudget} onDeletePeriod={onDeletePeriod} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} onDelete={onDelete} onDone={onDone}/>;
-    if(subPage==="share") return <ShareScreen txs={periodTxs} allTxs={activeTxs} goals={goals} period={period} setSubPage={setSubPage}/>;
+    if(subPage==="tx-list") return <TxListScreen txs={periodTxs} allTxs={activeTxs} goals={goals} period={period} setPeriod={updatePeriod} years={periodYears} onCopyBudget={onCopyBudget} onDeletePeriod={onDeletePeriod} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} onDelete={onDelete} onDone={onDone} onCopy={onCopyTx}/>;
+    if(subPage==="share") return <ShareScreen txs={periodTxs} allTxs={activeTxs} goals={goals} period={period} categoryGroups={categoryGroups} setSubPage={setSubPage}/>;
     if(tab==="home") return <HomeScreen txs={periodTxs} allTxs={activeTxs} goals={goals} period={period} setPeriod={updatePeriod} years={periodYears} onCopyBudget={onCopyBudget} setTab={setTab} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} openUpgrade={openUpgrade} isPro={isPro} user={appUser} cloudUser={cloudUser} hasUnsyncedChanges={hasUnsyncedChanges} onCloudBackup={onCloudBackup}/>;
     if(tab==="reports") return <ReportsScreen txs={periodTxs} period={period} setPeriod={updatePeriod} years={periodYears} openUpgrade={openUpgrade}/>;
     if(tab==="goals-tab") return <GoalsScreen goals={goals} txs={activeTxs} isPro={isPro} openUpgrade={openUpgrade} onAddSaving={onAddGoalSaving} onAddGoal={onAddGoal} onEditGoal={onEditGoal} onDeleteGoal={onDeleteGoal}/>;

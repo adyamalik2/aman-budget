@@ -13,6 +13,7 @@ const AddSheet = ({editTx, goals = [], accounts = DEFAULT_ACCOUNTS, categoryGrou
   const initialGroup = categoryGroups.find(group=>group?.active !== false && group?.id)?.id || "";
   const [f, setF] = useState(editTx || {date:new Date().toISOString().slice(0,10), type:"expense", grp:initialGroup, cat:"", desc:"", amt:"", status:"estimasi", pay:"transfer", acc:initialAccount, goalId:null});
   const [err, setErr] = useState({});
+  const [showCatSuggestions, setShowCatSuggestions] = useState(false);
   const s = (k,v) => setF(p=>({...p, [k]:v}));
   const statusOptions = Object.entries(STATUS).filter(([v])=>f.type==="income" ? ["estimasi","selesai","batal"].includes(v) : true);
   const accountOptions = accounts
@@ -27,6 +28,9 @@ const AddSheet = ({editTx, goals = [], accounts = DEFAULT_ACCOUNTS, categoryGrou
   }
   const activeCategories = (categoryGroups.find(group=>group.id === f.grp)?.categories || [])
     .filter(category=>category?.active !== false && category?.name);
+  const categorySuggestions = activeCategories
+    .filter(category=>!f.cat || category.name.toLowerCase().includes(f.cat.toLowerCase()))
+    .slice(0, 8);
 
   const save = () => {
     const e = {};
@@ -68,7 +72,7 @@ const AddSheet = ({editTx, goals = [], accounts = DEFAULT_ACCOUNTS, categoryGrou
             {f.type==="expense" && (
               <div>
                 <label style={lbl}>Grup</label>
-                <select style={inp} value={f.grp} onChange={e=>s("grp", e.target.value)}>
+                <select style={inp} value={f.grp} onChange={e=>{s("grp", e.target.value); setShowCatSuggestions(true);}}>
                   {groupOptions.map(group=><option key={group.id} value={group.id} style={{color:C.text, background:"#fff"}}>{group.label}</option>)}
                 </select>
               </div>
@@ -77,10 +81,16 @@ const AddSheet = ({editTx, goals = [], accounts = DEFAULT_ACCOUNTS, categoryGrou
 
           <div>
             <label style={lbl}>Kategori</label>
-            <input list="aman-budget-category-options" style={inp} placeholder="Sekolah, Belanja, Cicilan..." value={f.cat} onChange={e=>s("cat", e.target.value)}/>
-            <datalist id="aman-budget-category-options">
-              {activeCategories.map(category=><option key={category.id || category.name} value={category.name}/>)}
-            </datalist>
+            <input style={inp} placeholder="Sekolah, Belanja, Cicilan..." value={f.cat} onFocus={()=>setShowCatSuggestions(true)} onBlur={()=>setShowCatSuggestions(false)} onChange={e=>{s("cat", e.target.value); setShowCatSuggestions(true);}}/>
+            {showCatSuggestions && categorySuggestions.length > 0 && (
+              <div style={{marginTop:6, border:`1px solid ${C.borderL}`, borderRadius:12, background:"#fff", padding:6, display:"flex", flexWrap:"wrap", gap:6, maxHeight:96, overflowY:"auto"}}>
+                {categorySuggestions.map(category=>(
+                  <button key={category.id || category.name} type="button" onMouseDown={e=>{e.preventDefault(); s("cat", category.name); setShowCatSuggestions(false);}} style={{border:"none", borderRadius:999, background:C.priBg, color:C.priD, padding:"6px 10px", fontSize:11, fontWeight:800, cursor:"pointer"}}>
+                    {category.name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div>

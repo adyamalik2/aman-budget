@@ -8,8 +8,8 @@ import {
   CloudCheck,
   Crown,
   FileDown,
-  PiggyBank,
   Receipt,
+  Target,
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
@@ -111,7 +111,7 @@ const HomeScreen = ({txs, allTxs = [], goals = [], period, setPeriod, years, onC
           {[
             {icon:ArrowRightLeft, label:"Transfer", color:C.blue, action:()=>setSubPage("transfer")},
             {icon:Calculator, label:"Zakat", color:C.pri, action:()=>setSubPage("zakat")},
-            {icon:PiggyBank, label:"Goals", color:C.gold, action:()=>{setTab("goals-tab"); setSubPage(null);}},
+            {icon:Target, label:"Goals", color:C.gold, action:()=>{setTab("goals-tab"); setSubPage(null);}},
             {icon:FileDown, label:"Export", color:"#8b5cf6", action:isPro ? ()=>setSubPage("share") : openUpgrade},
           ].map((q,i)=>(
             <button key={i} onClick={q.action} style={{background:"#fff", border:`1px solid ${C.borderL}`, borderRadius:14, padding:"10px 4px", cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", gap:4}}>

@@ -118,7 +118,7 @@ const GrpTable = ({grpKey, txList, goals}) => {
   );
 };
 
-const ShareScreen = ({txs, allTxs = [], goals = [], period = null, setSubPage}) => {
+const ShareScreen = ({txs, allTxs = [], goals = [], period = null, categoryGroups = [], setSubPage}) => {
   const [format, setFormat]       = useState("whatsapp");
   const [copied, setCopied]       = useState(false);
   const [filterGrp, setFilterGrp] = useState("all");
@@ -175,6 +175,9 @@ const ShareScreen = ({txs, allTxs = [], goals = [], period = null, setSubPage}) 
   }, [txs]);
 
   const activeGroups  = Object.keys(GROUPS).filter(k => groupedExpenses[k]?.length > 0);
+  const filterGroups = categoryGroups
+    .filter(group=>group?.active !== false && GROUPS[group.id])
+    .map(group=>({key:group.id, label:group.label || GROUPS[group.id]?.label || group.id}));
   const visibleGroups = filterGrp === "all"
     ? activeGroups
     : (groupedExpenses[filterGrp]?.length > 0 ? [filterGrp] : []);
@@ -376,7 +379,7 @@ const ShareScreen = ({txs, allTxs = [], goals = [], period = null, setSubPage}) 
             <div className="no-print" style={{padding:"10px 14px 0"}}>
               <p style={{fontSize:11, fontWeight:700, color:C.textM, margin:"0 0 7px"}}>Filter Grup:</p>
               <div style={{display:"flex", gap:6, overflowX:"auto", paddingBottom:4, scrollbarWidth:"none"}}>
-                {[{key:"all", label:"Semua Grup"}, ...Object.entries(GROUPS).map(([k, v]) => ({key:k, label:v.label}))].map(opt => (
+                {[{key:"all", label:"Semua Grup"}, ...filterGroups].map(opt => (
                   <button key={opt.key} onClick={()=>setFilterGrp(opt.key)} style={{
                     padding:"6px 13px", borderRadius:20, border:"none", cursor:"pointer", whiteSpace:"nowrap",
                     fontSize:11, fontWeight:700, flexShrink:0,

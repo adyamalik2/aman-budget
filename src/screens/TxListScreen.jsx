@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ChevronLeft, Filter, Search, Trash2 } from "lucide-react";
+import { ChevronLeft, Copy, Filter, Search, Trash2 } from "lucide-react";
 import PeriodPicker from "../components/period/PeriodPicker";
 import Badge from "../components/ui/Badge";
 import Pill from "../components/ui/Pill";
@@ -9,13 +9,17 @@ import { C } from "../constants/theme";
 import { fmtS } from "../utils/format";
 import { formatPeriodLabel, formatShortDate } from "../utils/period";
 
-const TxListScreen = ({txs, allTxs, goals = [], period, setPeriod, years, onCopyBudget, onDeletePeriod, setSubPage, setEditTx, setAddOpen, onDelete, onDone}) => {
+const TxListScreen = ({txs, allTxs, goals = [], period, setPeriod, years, onCopyBudget, onDeletePeriod, setSubPage, setEditTx, setAddOpen, onDelete, onDone, onCopy}) => {
   const [fS, setFS] = useState("all");
   const [fG] = useState("all");
   const [fGoal, setFGoal] = useState("all");
   const [q, setQ] = useState("");
   const [deleteOpen, setDeleteOpen] = useState(false);
   const periodLabel = formatPeriodLabel(period);
+  const openEdit = tx => {
+    setEditTx(tx);
+    setAddOpen(true);
+  };
 
   const filtered = useMemo(()=>txs.filter(tx=>{
     if(fS!=="all"&&tx.status!==fS) return false;
@@ -79,7 +83,7 @@ const TxListScreen = ({txs, allTxs, goals = [], period, setPeriod, years, onCopy
             {filtered.map((tx,i)=>{
               const goalName = tx.goalId ? (goals.find(g=>g.id===tx.goalId)?.name ?? null) : null;
               return (
-              <div key={tx.id} style={{display:"grid", gridTemplateColumns:"42px minmax(0, 1fr) auto", gap:9, alignItems:"center", padding:"9px 10px", borderBottom:i<filtered.length-1?`1px solid ${C.borderL}`:"none", background:"#fff"}}>
+              <div key={tx.id} onClick={()=>openEdit(tx)} style={{display:"grid", gridTemplateColumns:"42px minmax(0, 1fr) auto", gap:9, alignItems:"center", padding:"9px 10px", borderBottom:i<filtered.length-1?`1px solid ${C.borderL}`:"none", background:"#fff", cursor:"pointer"}}>
                 <div style={{fontSize:11, fontWeight:800, color:C.textM, lineHeight:1.2, textAlign:"center"}}>{formatShortDate(tx.date)}</div>
                 <div style={{minWidth:0}}>
                   <p style={{fontSize:13, fontWeight:700, color:C.text, margin:0, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", lineHeight:1.25}}>{tx.desc}</p>
@@ -101,13 +105,16 @@ const TxListScreen = ({txs, allTxs, goals = [], period, setPeriod, years, onCopy
                   </p>
                   <div style={{display:"flex", gap:4, justifyContent:"flex-end", flexWrap:"wrap"}}>
                     {tx.type==="income" && tx.status==="estimasi" && (
-                      <button onClick={()=>onDone(tx.id)} style={{background:C.priL, color:C.priD, border:"none", borderRadius:7, padding:"4px 6px", fontSize:10, fontWeight:800, cursor:"pointer"}}>Diterima</button>
+                      <button onClick={e=>{e.stopPropagation(); onDone(tx.id);}} style={{background:C.priL, color:C.priD, border:"none", borderRadius:7, padding:"4px 6px", fontSize:10, fontWeight:800, cursor:"pointer"}}>Diterima</button>
                     )}
                     {tx.status==="belum_selesai" && (
-                      <button onClick={()=>onDone(tx.id)} style={{background:C.priL, color:C.priD, border:"none", borderRadius:7, padding:"4px 6px", fontSize:10, fontWeight:800, cursor:"pointer"}}>Lunas</button>
+                      <button onClick={e=>{e.stopPropagation(); onDone(tx.id);}} style={{background:C.priL, color:C.priD, border:"none", borderRadius:7, padding:"4px 6px", fontSize:10, fontWeight:800, cursor:"pointer"}}>Lunas</button>
                     )}
-                    <button onClick={()=>{setEditTx(tx); setAddOpen(true);}} style={{background:C.borderL, color:C.textM, border:"none", borderRadius:7, padding:"4px 6px", fontSize:10, fontWeight:800, cursor:"pointer"}}>Edit</button>
-                    <button onClick={()=>onDelete(tx.id)} aria-label="Hapus transaksi" style={{background:"#fef2f2", color:C.red, border:"none", borderRadius:7, padding:"4px 6px", cursor:"pointer", display:"flex"}}>
+                    <button onClick={e=>{e.stopPropagation(); onCopy?.(tx);}} style={{background:C.blueL, color:C.blue, border:"none", borderRadius:7, padding:"4px 6px", fontSize:10, fontWeight:800, cursor:"pointer", display:"flex", alignItems:"center", gap:3}}>
+                      <Copy size={11}/> Copy
+                    </button>
+                    <button onClick={e=>{e.stopPropagation(); openEdit(tx);}} style={{background:C.borderL, color:C.textM, border:"none", borderRadius:7, padding:"4px 6px", fontSize:10, fontWeight:800, cursor:"pointer"}}>Edit</button>
+                    <button onClick={e=>{e.stopPropagation(); onDelete(tx.id);}} aria-label="Hapus transaksi" style={{background:"#fef2f2", color:C.red, border:"none", borderRadius:7, padding:"4px 6px", cursor:"pointer", display:"flex"}}>
                       <Trash2 size={12}/>
                     </button>
                   </div>

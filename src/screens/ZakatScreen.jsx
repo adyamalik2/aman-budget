@@ -1,20 +1,24 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CheckCircle2, Plus } from "lucide-react";
 import Header from "../components/layout/Header";
 import Btn from "../components/ui/Button";
 import { C } from "../constants/theme";
 import { fmt } from "../utils/format";
+import { loadStored, saveStored } from "../utils/storage";
 
 const card = {background:"#fff", borderRadius:16, padding:"14px 16px", border:`1px solid ${C.borderL}`, boxShadow:"0 1px 4px rgba(0,0,0,0.03)"};
 const inp = {width:"100%", border:`1.5px solid ${C.border}`, borderRadius:12, padding:"11px 14px", fontSize:14, outline:"none", boxSizing:"border-box", background:"#fff", color:C.text};
 const lbl = {fontSize:12, fontWeight:600, color:C.textM, display:"block", marginBottom:6};
+const ZAKAT_INCOME_KEY = "amanBudget.zakatIncome";
 
-const ZakatScreen = ({setSubPage}) => {
-  const [income, setIncome] = useState("18500000");
+const ZakatScreen = ({setSubPage, onAddZakatBudget}) => {
+  const [income, setIncome] = useState(() => loadStored(ZAKAT_INCOME_KEY, "18500000", value=>typeof value === "string" || typeof value === "number"));
   const num = Number(income) || 0;
   const zakat = num * 0.025;
   const nisab = 7500000; // approx
   const wajib = num >= nisab;
+
+  useEffect(()=>{ saveStored(ZAKAT_INCOME_KEY, String(income)); }, [income]);
 
   return (
     <div style={{flex:1, overflowY:"auto", paddingBottom:92, background:C.bg}}>
@@ -57,7 +61,7 @@ const ZakatScreen = ({setSubPage}) => {
           ))}
         </div>
 
-        <Btn primary>
+        <Btn primary onClick={()=>onAddZakatBudget?.(zakat)} disabled={zakat <= 0}>
           <span style={{display:"flex", alignItems:"center", justifyContent:"center", gap:6}}>
             <Plus size={16}/> Tambahkan ke Budget Bulan Ini
           </span>
