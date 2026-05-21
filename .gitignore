@@ -28,3 +28,9 @@ android/app/build/
 *.sw?
 
 # Android release/build outputs
+
+# Android release artifacts
+/android/app/release/
+/android/app/build/
+*.keystore
+*.jks
