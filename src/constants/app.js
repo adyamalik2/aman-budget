@@ -15,6 +15,42 @@ export const GROUPS = {
   lain_lain: {label:"Lain-lain", color:"#6b7280"},
 };
 
+const DEFAULT_GROUP_CATEGORIES = {
+  rumah: ["Listrik & Air", "WiFi Indihome", "Cicilan KPR", "Maintenance Rumah"],
+  bunda: ["Belanja Bulanan", "Uang Sekolah Anak", "Dapur", "Kebutuhan Bunda"],
+  abang: ["Transportasi", "Pulsa", "Kerja", "Kopi"],
+  anak: ["Susu & Popok", "Sekolah", "Kesehatan Anak", "Mainan"],
+  zakat_sedekah: ["Zakat", "Sedekah", "Donasi"],
+  tabungan: ["Tabungan Darurat", "Umroh", "Pendidikan Anak"],
+  kesehatan: ["Obat", "Dokter", "BPJS"],
+  darurat: ["Emergency", "Bantuan Keluarga"],
+  hiburan: ["Liburan", "Makan di Luar"],
+  dapur_makan: ["Dapur", "Makan di Luar", "Belanja Bulanan"],
+  transportasi: ["Transportasi", "BBM", "Parkir"],
+  pendidikan: ["Uang Sekolah Anak", "Pendidikan Anak", "Buku"],
+  cicilan: ["Cicilan KPR", "Cicilan Kendaraan", "Cicilan Lainnya"],
+  lain_lain: ["Lain-lain"],
+};
+
+const toCategory = (groupId, name, index) => ({
+  id: `${groupId}-${index + 1}`,
+  name,
+  active: true,
+});
+
+export const DEFAULT_ACCOUNTS = [
+  {id:"bsi", name:"BSI", type:"Bank", active:true},
+  {id:"cash", name:"Cash", type:"Cash", active:true},
+];
+
+export const DEFAULT_CATEGORY_GROUPS = Object.entries(GROUPS).map(([id, group]) => ({
+  id,
+  label: group.label,
+  color: group.color,
+  active: true,
+  categories: (DEFAULT_GROUP_CATEGORIES[id] || [group.label]).map((name, index) => toCategory(id, name, index)),
+}));
+
 export const STATUS = {
   estimasi: {label:"Estimasi", bg:"#fef9c3", color:"#854d0e"},
   selesai: {label:"Selesai", bg:"#dcfce7", color:"#166534"},
@@ -32,4 +68,6 @@ export const STORAGE_KEYS = {
   user: "amanBudget.user",
   period: "amanBudget.period",
   isPro: "aman_budget_is_pro",
+  accounts: "amanBudget.accounts",
+  categoryGroups: "amanBudget.categoryGroups",
 };

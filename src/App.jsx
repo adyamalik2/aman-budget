@@ -10,13 +10,15 @@ import TransferScreen from "./screens/TransferScreen";
 import ZakatScreen from "./screens/ZakatScreen";
 import UpgradeScreen from "./screens/UpgradeScreen";
 import MoreScreen from "./screens/MoreScreen";
+import AccountsScreen from "./screens/AccountsScreen";
+import CategoryGroupsScreen from "./screens/CategoryGroupsScreen";
 import ReportsScreen from "./screens/ReportsScreen";
 import TxListScreen from "./screens/TxListScreen";
 import ShareScreen from "./screens/ShareScreen";
 import WelcomeScreen from "./screens/WelcomeScreen";
 import AddSheet from "./features/transactions/AddSheet";
 import { C } from "./constants/theme";
-import { STORAGE_KEYS } from "./constants/app";
+import { DEFAULT_ACCOUNTS, DEFAULT_CATEGORY_GROUPS, STORAGE_KEYS } from "./constants/app";
 import { INIT_GOALS, INIT_TX } from "./data/initialData";
 import { auth, googleProvider, isFirebaseConfigured } from "./lib/firebase";
 import { backupToCloud, restoreFromCloud } from "./lib/cloudBackup";
@@ -48,6 +50,8 @@ export default function App() {
   const [editTx, setEditTx] = useState(null);
   const [txs, setTxs] = useState(() => loadStored(STORAGE_KEYS.txs, INIT_TX, Array.isArray));
   const [goals, setGoals] = useState(() => loadStored(STORAGE_KEYS.goals, INIT_GOALS, Array.isArray));
+  const [accounts, setAccounts] = useState(() => loadStored(STORAGE_KEYS.accounts, DEFAULT_ACCOUNTS, Array.isArray));
+  const [categoryGroups, setCategoryGroups] = useState(() => loadStored(STORAGE_KEYS.categoryGroups, DEFAULT_CATEGORY_GROUPS, Array.isArray));
   const [period, setPeriod] = useState(() => normalizePeriod(loadStored(STORAGE_KEYS.period, getDefaultPeriod(), v=>v&&typeof v==="object"&&!Array.isArray(v))));
   const [isPro, setIsPro] = useState(() => loadStored(STORAGE_KEYS.isPro, false, v=>v===true||v===false));
   const [cloudUser, setCloudUser] = useState(null);
@@ -58,6 +62,8 @@ export default function App() {
 
   useEffect(()=>{ saveStored(STORAGE_KEYS.txs, txs); }, [txs]);
   useEffect(()=>{ saveStored(STORAGE_KEYS.goals, goals); }, [goals]);
+  useEffect(()=>{ saveStored(STORAGE_KEYS.accounts, accounts); }, [accounts]);
+  useEffect(()=>{ saveStored(STORAGE_KEYS.categoryGroups, categoryGroups); }, [categoryGroups]);
   useEffect(()=>{ saveStored(STORAGE_KEYS.period, normalizePeriod(period)); }, [period]);
   useEffect(()=>{ saveStored(STORAGE_KEYS.isPro, isPro); }, [isPro]);
   useEffect(()=>{ saveStored(SKIP_LOGIN_KEY, hasSkippedLogin); }, [hasSkippedLogin]);
@@ -86,9 +92,11 @@ export default function App() {
   const cloudBackupPayload = useMemo(()=>({
     transactions: txs,
     goals,
+    accounts,
+    categoryGroups,
     periodSetting: normalizePeriod(period),
     user: appUser,
-  }), [txs, goals, period, appUser]);
+  }), [txs, goals, accounts, categoryGroups, period, appUser]);
   const onContinueLocal = () => {
     setHasSkippedLogin(true);
     setUser(LOCAL_MODE_USER);
@@ -156,6 +164,14 @@ export default function App() {
     setHasUnsyncedChanges(true);
     setGoals(p=>p.filter(g=>g.id!==id));
   };
+  const onAccountsChange = nextAccounts => {
+    setHasUnsyncedChanges(true);
+    setAccounts(nextAccounts);
+  };
+  const onCategoryGroupsChange = nextCategoryGroups => {
+    setHasUnsyncedChanges(true);
+    setCategoryGroups(nextCategoryGroups);
+  };
   const onCopyBudget = () => {
     const p = normalizePeriod(period);
     if(p.mode !== "month") return;
@@ -180,6 +196,8 @@ export default function App() {
         exportedAt:new Date().toISOString(),
         transactions:txs,
         goals,
+        accounts,
+        categoryGroups,
         user,
         period:normalizePeriod(period),
       };
@@ -215,6 +233,8 @@ export default function App() {
 
       setTxs(data.transactions.map(tx=>({...tx, amt:Number(tx.amt)})));
       if(data.goals !== undefined) setGoals(data.goals);
+      if(Array.isArray(data.accounts)) setAccounts(data.accounts);
+      if(Array.isArray(data.categoryGroups)) setCategoryGroups(data.categoryGroups);
       if(Object.prototype.hasOwnProperty.call(data, "user")) setUser(data.user);
       if(data.period !== undefined) setPeriod(normalizePeriod(data.period));
       setHasUnsyncedChanges(true);
@@ -319,6 +339,8 @@ export default function App() {
 
       setTxs(restoredTxs.map(tx=>({...tx, amt:Number(tx.amt)})));
       if(Array.isArray(data.goals)) setGoals(data.goals);
+      if(Array.isArray(data.accounts)) setAccounts(data.accounts);
+      if(Array.isArray(data.categoryGroups)) setCategoryGroups(data.categoryGroups);
       if(data.periodSetting !== undefined) setPeriod(normalizePeriod(data.periodSetting));
       else if(data.period !== undefined) setPeriod(normalizePeriod(data.period));
       if(data.user && typeof data.user === "object") setUser(data.user);
@@ -378,6 +400,8 @@ export default function App() {
     if(subPage==="upgrade") return <UpgradeScreen setSubPage={setSubPage} isPro={isPro} onActivatePro={onActivatePro} onDeactivatePro={onDeactivatePro}/>;
     if(subPage==="transfer") return <TransferScreen txs={activeTxs} setSubPage={setSubPage}/>;
     if(subPage==="zakat") return <ZakatScreen setSubPage={setSubPage}/>;
+    if(subPage==="accounts") return <AccountsScreen accounts={accounts} onAccountsChange={onAccountsChange} setSubPage={setSubPage}/>;
+    if(subPage==="category-groups") return <CategoryGroupsScreen categoryGroups={categoryGroups} onCategoryGroupsChange={onCategoryGroupsChange} setSubPage={setSubPage}/>;
     if(subPage==="tx-list") return <TxListScreen txs={periodTxs} allTxs={activeTxs} goals={goals} period={period} setPeriod={updatePeriod} years={periodYears} onCopyBudget={onCopyBudget} onDeletePeriod={onDeletePeriod} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} onDelete={onDelete} onDone={onDone}/>;
     if(subPage==="share") return <ShareScreen txs={periodTxs} allTxs={activeTxs} goals={goals} period={period} setSubPage={setSubPage}/>;
     if(tab==="home") return <HomeScreen txs={periodTxs} allTxs={activeTxs} goals={goals} period={period} setPeriod={updatePeriod} years={periodYears} onCopyBudget={onCopyBudget} setTab={setTab} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} openUpgrade={openUpgrade} isPro={isPro} user={appUser} cloudUser={cloudUser} hasUnsyncedChanges={hasUnsyncedChanges} onCloudBackup={onCloudBackup}/>;
@@ -401,7 +425,7 @@ export default function App() {
       <div style={{width:"100%", maxWidth:430, display:"flex", flexDirection:"column", minHeight:"100vh", position:"relative", background:C.bg}}>
         {renderScreen()}
         {!hideNav && <BottomNav tab={tab} setTab={(t)=>{setTab(t); setSubPage(null);}} setAddOpen={setAddOpen} setEditTx={setEditTx}/>}
-        {addOpen && <AddSheet editTx={editTx} goals={goals} onSave={onSave} onClose={()=>{setAddOpen(false); setEditTx(null);}}/>}
+        {addOpen && <AddSheet editTx={editTx} goals={goals} accounts={accounts} categoryGroups={categoryGroups} onSave={onSave} onClose={()=>{setAddOpen(false); setEditTx(null);}}/>}
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Check, TrendingDown, TrendingUp, X } from "lucide-react";
-import { GROUPS, STATUS } from "../../constants/app";
+import { DEFAULT_ACCOUNTS, DEFAULT_CATEGORY_GROUPS, GROUPS, STATUS } from "../../constants/app";
 import { C } from "../../constants/theme";
 import { fmt } from "../../utils/format";
 
@@ -8,11 +8,25 @@ const inp = {width:"100%", border:`1.5px solid ${C.border}`, borderRadius:12, pa
 const lbl = {fontSize:12, fontWeight:600, color:C.textM, display:"block", marginBottom:6};
 const sheetBodyStyle = {padding:"14px 14px calc(24px + env(safe-area-inset-bottom))", display:"flex", flexDirection:"column", gap:14};
 
-const AddSheet = ({editTx, goals = [], onSave, onClose}) => {
-  const [f, setF] = useState(editTx || {date:new Date().toISOString().slice(0,10), type:"expense", grp:"bunda", cat:"", desc:"", amt:"", status:"estimasi", pay:"transfer", acc:"BSI", goalId:null});
+const AddSheet = ({editTx, goals = [], accounts = DEFAULT_ACCOUNTS, categoryGroups = DEFAULT_CATEGORY_GROUPS, onSave, onClose}) => {
+  const initialAccount = accounts.find(account=>account?.active !== false && account?.name)?.name || "BSI";
+  const initialGroup = categoryGroups.find(group=>group?.active !== false && group?.id)?.id || "bunda";
+  const [f, setF] = useState(editTx || {date:new Date().toISOString().slice(0,10), type:"expense", grp:initialGroup, cat:"", desc:"", amt:"", status:"estimasi", pay:"transfer", acc:initialAccount, goalId:null});
   const [err, setErr] = useState({});
   const s = (k,v) => setF(p=>({...p, [k]:v}));
   const statusOptions = Object.entries(STATUS).filter(([v])=>f.type==="income" ? ["estimasi","selesai","batal"].includes(v) : true);
+  const accountOptions = accounts
+    .filter(account=>account?.active !== false && account?.name)
+    .map(account=>account.name);
+  if(f.acc && !accountOptions.includes(f.acc)) accountOptions.push(f.acc);
+  const groupOptions = categoryGroups
+    .filter(group=>group?.active !== false && group?.id)
+    .map(group=>({id:group.id, label:group.label || GROUPS[group.id]?.label || group.id}));
+  if(f.grp && !groupOptions.some(group=>group.id === f.grp)) {
+    groupOptions.push({id:f.grp, label:GROUPS[f.grp]?.label || f.grp});
+  }
+  const activeCategories = (categoryGroups.find(group=>group.id === f.grp)?.categories || [])
+    .filter(category=>category?.active !== false && category?.name);
 
   const save = () => {
     const e = {};
@@ -38,7 +52,7 @@ const AddSheet = ({editTx, goals = [], onSave, onClose}) => {
             <label style={lbl}>Tipe Transaksi</label>
             <div style={{display:"flex", gap:8}}>
               {[["income","Pemasukan", TrendingUp, C.pri],["expense","Pengeluaran", TrendingDown, C.red]].map(([v,l,Ic,col])=>(
-                <button key={v} onClick={()=>{s("type",v); s("status", v==="income"?"selesai":"estimasi");}}
+                <button key={v} onClick={()=>{s("type",v); s("status", v==="income"?"selesai":"estimasi"); if(v==="expense"&&!f.grp&&groupOptions[0]) s("grp", groupOptions[0].id);}}
                   style={{flex:1, padding:"12px", borderRadius:12, border:`1.5px solid ${f.type===v?col:C.border}`, background:f.type===v?col+"10":"#fff", color:f.type===v?col:C.textM, fontSize:13, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:6}}>
                   <Ic size={15}/> {l}
                 </button>
@@ -55,7 +69,7 @@ const AddSheet = ({editTx, goals = [], onSave, onClose}) => {
               <div>
                 <label style={lbl}>Grup</label>
                 <select style={inp} value={f.grp} onChange={e=>s("grp", e.target.value)}>
-                  {Object.entries(GROUPS).map(([v,l])=><option key={v} value={v} style={{color:C.text, background:"#fff"}}>{l.label}</option>)}
+                  {groupOptions.map(group=><option key={group.id} value={group.id} style={{color:C.text, background:"#fff"}}>{group.label}</option>)}
                 </select>
               </div>
             )}
@@ -63,7 +77,10 @@ const AddSheet = ({editTx, goals = [], onSave, onClose}) => {
 
           <div>
             <label style={lbl}>Kategori</label>
-            <input style={inp} placeholder="Sekolah, Belanja, Cicilan..." value={f.cat} onChange={e=>s("cat", e.target.value)}/>
+            <input list="aman-budget-category-options" style={inp} placeholder="Sekolah, Belanja, Cicilan..." value={f.cat} onChange={e=>s("cat", e.target.value)}/>
+            <datalist id="aman-budget-category-options">
+              {activeCategories.map(category=><option key={category.id || category.name} value={category.name}/>)}
+            </datalist>
           </div>
 
           <div>
@@ -112,7 +129,7 @@ const AddSheet = ({editTx, goals = [], onSave, onClose}) => {
             <div>
               <label style={lbl}>Rekening</label>
               <select style={inp} value={f.acc} onChange={e=>s("acc", e.target.value)}>
-                {["BSI","Mandiri","BCA","Cash","Lainnya"].map(a=><option key={a} value={a}>{a}</option>)}
+                {accountOptions.map(a=><option key={a} value={a}>{a}</option>)}
               </select>
             </div>
           </div>

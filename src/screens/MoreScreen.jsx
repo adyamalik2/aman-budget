@@ -182,8 +182,8 @@ const MoreScreen = ({
         {/* Settings */}
         <div style={{...card, padding:0}}>
           {[
-            {icon:CreditCard, label:"Kelola Rekening"},
-            {icon:LayoutGrid, label:"Kategori & Grup"},
+            {icon:CreditCard, label:"Kelola Rekening", action:()=>setSubPage("accounts")},
+            {icon:LayoutGrid, label:"Kategori & Grup", action:()=>setSubPage("category-groups")},
             {icon:Trash2, label:"Tong Sampah", action:()=>setTrashOpen(true)},
             {icon:Shield, label:"Keamanan & Privasi"},
             {icon:Star, label:"Beri Rating"},
