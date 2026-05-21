@@ -80,4 +80,5 @@ export const STORAGE_KEYS = {
   lastTxDate: "amanBudget.lastTransactionDate",
   transfers: "amanBudget.transfers",
   quickShortcuts: "amanBudget.quickShortcuts",
+  backupMeta: "amanBudget.backupMeta",
 };

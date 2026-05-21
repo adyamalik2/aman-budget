@@ -17,10 +17,15 @@ const isValidBackupTx = tx => (
   Number.isFinite(Number(tx.amt))
 );
 
+const knownBackupFields = ["transactions", "goals", "accounts", "categoryGroups", "transfers", "quickShortcuts", "periodSetting", "period"];
+
 export const isValidBackupData = data => {
-  if(!isRecord(data)||!Array.isArray(data.transactions)) return false;
-  if(!data.transactions.every(isValidBackupTx)) return false;
+  if(!isRecord(data)) return false;
+  if(!knownBackupFields.some(field=>Object.prototype.hasOwnProperty.call(data, field))) return false;
+  if(data.transactions !== undefined && (!Array.isArray(data.transactions)||!data.transactions.every(isValidBackupTx))) return false;
   if(data.goals !== undefined && (!Array.isArray(data.goals)||!data.goals.every(isRecord))) return false;
+  if(data.accounts !== undefined && (!Array.isArray(data.accounts)||!data.accounts.every(isRecord))) return false;
+  if(data.categoryGroups !== undefined && (!Array.isArray(data.categoryGroups)||!data.categoryGroups.every(isRecord))) return false;
   if(data.transfers !== undefined && (!Array.isArray(data.transfers)||!data.transfers.every(isRecord))) return false;
   if(data.quickShortcuts !== undefined && (!Array.isArray(data.quickShortcuts)||!data.quickShortcuts.every(isRecord))) return false;
   if(data.user !== undefined && data.user !== null && !isRecord(data.user)) return false;

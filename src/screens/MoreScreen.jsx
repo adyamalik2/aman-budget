@@ -19,6 +19,7 @@ const MoreScreen = ({
   onLogout,
   onExportBackup,
   onImportBackup,
+  backupMeta = {},
   cloudUser,
   cloudBusy = false,
   hasUnsyncedChanges = false,
@@ -36,6 +37,20 @@ const MoreScreen = ({
   const profileName = cloudUser ? (cloudUser.displayName || cloudNameFallback) : "Malik (Lokal)";
   const profileSubtitle = cloudUser ? (cloudEmail || "Email tidak tersedia") : "Mode Lokal - Data di HP";
   const profileInitial = profileName.trim().charAt(0).toUpperCase() || "P";
+  const formatMetaDate = value => {
+    if(!value) return "Belum ada";
+    const date = new Date(value);
+    if(Number.isNaN(date.getTime())) return "Belum ada";
+    return date.toLocaleString("id-ID", {day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit"});
+  };
+  const backupRows = [
+    ["Mode data", cloudUser ? "Cloud login" : "Lokal"],
+    ["Email", cloudUser?.email || "Mode Lokal"],
+    ["Backup cloud terakhir", formatMetaDate(backupMeta.lastCloudBackupAt)],
+    ["Restore cloud terakhir", formatMetaDate(backupMeta.lastCloudRestoreAt)],
+    ["Export lokal terakhir", formatMetaDate(backupMeta.lastLocalExportAt)],
+    ["Import lokal terakhir", formatMetaDate(backupMeta.lastLocalImportAt)],
+  ];
   const items = [
     {icon:ArrowRightLeft, label:"Transfer Planner", desc:"Alokasi per anggota keluarga", action:()=>setSubPage("transfer"), color:C.blue},
     {icon:Calculator, label:"Kalkulator Zakat", desc:"Hitung zakat penghasilan 2.5%", action:()=>setSubPage("zakat"), color:C.pri},
@@ -122,6 +137,27 @@ const MoreScreen = ({
               <ChevronRight size={16} color={C.textL}/>
             </button>
           ))}
+        </div>
+
+        {/* Backup status */}
+        <div style={card}>
+          <div style={{display:"flex", alignItems:"flex-start", gap:10, marginBottom:10}}>
+            <div style={{width:38, height:38, borderRadius:11, background:C.blue+"15", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0}}>
+              <Shield size={18} color={C.blue}/>
+            </div>
+            <div style={{flex:1}}>
+              <p style={{fontSize:13, fontWeight:800, color:C.text, margin:0}}>Status Backup</p>
+              <p style={{fontSize:11, color:C.textM, margin:"2px 0 0", lineHeight:1.4}}>Riwayat backup dan restore terakhir di perangkat ini.</p>
+            </div>
+          </div>
+          <div style={{display:"flex", flexDirection:"column", gap:7}}>
+            {backupRows.map(([label, value])=>(
+              <div key={label} style={{display:"flex", justifyContent:"space-between", gap:10, borderTop:`1px solid ${C.borderL}`, paddingTop:7}}>
+                <span style={{fontSize:11, color:C.textM}}>{label}</span>
+                <span style={{fontSize:11, color:C.text, fontWeight:800, textAlign:"right", wordBreak:"break-word"}}>{value}</span>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Backup data */}
