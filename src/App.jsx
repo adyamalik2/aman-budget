@@ -11,9 +11,9 @@ import ZakatScreen from "./screens/ZakatScreen";
 import UpgradeScreen from "./screens/UpgradeScreen";
 import MoreScreen from "./screens/MoreScreen";
 import ReportsScreen from "./screens/ReportsScreen";
-import LoginScreen from "./screens/LoginScreen";
 import TxListScreen from "./screens/TxListScreen";
 import ShareScreen from "./screens/ShareScreen";
+import WelcomeScreen from "./screens/WelcomeScreen";
 import AddSheet from "./features/transactions/AddSheet";
 import { C } from "./constants/theme";
 import { STORAGE_KEYS } from "./constants/app";
@@ -36,6 +36,8 @@ import {
 const GOAL_COLORS = ["#16a34a","#2563eb","#d97706","#dc2626","#7c3aed","#0891b2"];
 const GOAL_ICONS  = ["plane","grad","shield"];
 const GOOGLE_WEB_CLIENT_ID = "755957066136-nk0gmi6pf6mqo22r7iu2tr2p6nu6rf4c.apps.googleusercontent.com";
+const SKIP_LOGIN_KEY = "aman_budget_skip_login";
+const LOCAL_MODE_USER = {name:"Malik", email:"mode-lokal@amanbudget.local"};
 
 // ─── APP ───
 export default function App() {
@@ -51,11 +53,14 @@ export default function App() {
   const [cloudUser, setCloudUser] = useState(null);
   const [cloudBusy, setCloudBusy] = useState(false);
   const [hasUnsyncedChanges, setHasUnsyncedChanges] = useState(false);
+  const [hasSkippedLogin, setHasSkippedLogin] = useState(() => loadStored(SKIP_LOGIN_KEY, false, v=>v===true||v===false));
+  const appUser = user || (hasSkippedLogin ? LOCAL_MODE_USER : null);
 
   useEffect(()=>{ saveStored(STORAGE_KEYS.txs, txs); }, [txs]);
   useEffect(()=>{ saveStored(STORAGE_KEYS.goals, goals); }, [goals]);
   useEffect(()=>{ saveStored(STORAGE_KEYS.period, normalizePeriod(period)); }, [period]);
   useEffect(()=>{ saveStored(STORAGE_KEYS.isPro, isPro); }, [isPro]);
+  useEffect(()=>{ saveStored(SKIP_LOGIN_KEY, hasSkippedLogin); }, [hasSkippedLogin]);
   useEffect(()=>{
     if(user) saveStored(STORAGE_KEYS.user, user);
     else removeStored(STORAGE_KEYS.user);
@@ -66,6 +71,10 @@ export default function App() {
     }
     const unsubscribe = onAuthStateChanged(auth, firebaseUser => {
       setCloudUser(firebaseUser);
+      if(firebaseUser) {
+        setUser(prev=>prev || {name:firebaseUser.displayName || "Google User", email:firebaseUser.email || ""});
+        setHasSkippedLogin(true);
+      }
     });
     return unsubscribe;
   }, []);
@@ -78,8 +87,12 @@ export default function App() {
     transactions: txs,
     goals,
     periodSetting: normalizePeriod(period),
-    user,
-  }), [txs, goals, period, user]);
+    user: appUser,
+  }), [txs, goals, period, appUser]);
+  const onContinueLocal = () => {
+    setHasSkippedLogin(true);
+    setUser(LOCAL_MODE_USER);
+  };
   const updatePeriod = nextPeriod => {
     setHasUnsyncedChanges(true);
     setPeriod(nextPeriod);
@@ -213,10 +226,11 @@ export default function App() {
   const onCloudLogin = async () => {
     if(!isFirebaseConfigured || !auth || !googleProvider) {
       alert("Firebase belum terkonfigurasi. Restart dev server atau cek .env.local.");
-      return;
+      return false;
     }
     setCloudBusy(true);
     try {
+      let credentialResult;
       if(Capacitor.isNativePlatform()) {
         await GoogleSignIn.initialize({
           clientId: GOOGLE_WEB_CLIENT_ID,
@@ -224,13 +238,18 @@ export default function App() {
         const googleUser = await GoogleSignIn.signIn();
         if(!googleUser.idToken) throw new Error("Google ID token kosong.");
         const credential = GoogleAuthProvider.credential(googleUser.idToken);
-        await signInWithCredential(auth, credential);
+        credentialResult = await signInWithCredential(auth, credential);
       } else {
-        await signInWithPopup(auth, googleProvider);
+        credentialResult = await signInWithPopup(auth, googleProvider);
       }
+      const firebaseUser = credentialResult.user;
+      setUser({name:firebaseUser.displayName || "Google User", email:firebaseUser.email || ""});
+      setHasSkippedLogin(true);
       alert("Login Google berhasil.");
+      return true;
     } catch {
       alert("Login Google gagal.");
+      return false;
     } finally {
       setCloudBusy(false);
     }
@@ -312,6 +331,10 @@ export default function App() {
     }
   };
   const openUpgrade = () => setSubPage("upgrade");
+  const onLocalLogout = () => {
+    setHasSkippedLogin(false);
+    setUser(null);
+  };
   const onActivatePro   = () => { setIsPro(true);  alert("Mode Pro sementara aktif untuk testing."); };
   const onDeactivatePro = () => setIsPro(false);
 
@@ -347,7 +370,9 @@ export default function App() {
     };
   }, [addOpen, subPage, tab]);
 
-  if(!user) return <LoginScreen onLogin={setUser}/>;
+  if(!user && !hasSkippedLogin) {
+    return <WelcomeScreen onGoogleLogin={onCloudLogin} onContinueLocal={onContinueLocal} busy={cloudBusy}/>;
+  }
 
   const renderScreen = () => {
     if(subPage==="upgrade") return <UpgradeScreen setSubPage={setSubPage} isPro={isPro} onActivatePro={onActivatePro} onDeactivatePro={onDeactivatePro}/>;
@@ -355,10 +380,10 @@ export default function App() {
     if(subPage==="zakat") return <ZakatScreen setSubPage={setSubPage}/>;
     if(subPage==="tx-list") return <TxListScreen txs={periodTxs} allTxs={activeTxs} goals={goals} period={period} setPeriod={updatePeriod} years={periodYears} onCopyBudget={onCopyBudget} onDeletePeriod={onDeletePeriod} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} onDelete={onDelete} onDone={onDone}/>;
     if(subPage==="share") return <ShareScreen txs={periodTxs} allTxs={activeTxs} goals={goals} period={period} setSubPage={setSubPage}/>;
-    if(tab==="home") return <HomeScreen txs={periodTxs} allTxs={activeTxs} goals={goals} period={period} setPeriod={updatePeriod} years={periodYears} onCopyBudget={onCopyBudget} setTab={setTab} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} openUpgrade={openUpgrade} isPro={isPro} user={user} cloudUser={cloudUser} hasUnsyncedChanges={hasUnsyncedChanges} onCloudBackup={onCloudBackup}/>;
+    if(tab==="home") return <HomeScreen txs={periodTxs} allTxs={activeTxs} goals={goals} period={period} setPeriod={updatePeriod} years={periodYears} onCopyBudget={onCopyBudget} setTab={setTab} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} openUpgrade={openUpgrade} isPro={isPro} user={appUser} cloudUser={cloudUser} hasUnsyncedChanges={hasUnsyncedChanges} onCloudBackup={onCloudBackup}/>;
     if(tab==="reports") return <ReportsScreen txs={periodTxs} period={period} setPeriod={updatePeriod} years={periodYears} openUpgrade={openUpgrade}/>;
     if(tab==="goals-tab") return <GoalsScreen goals={goals} txs={activeTxs} isPro={isPro} openUpgrade={openUpgrade} onAddSaving={onAddGoalSaving} onAddGoal={onAddGoal} onEditGoal={onEditGoal} onDeleteGoal={onDeleteGoal}/>;
-    if(tab==="more") return <MoreScreen setSubPage={setSubPage} openUpgrade={openUpgrade} isPro={isPro} onLogout={()=>setUser(null)} onExportBackup={onExportBackup} onImportBackup={onImportBackup} cloudUser={cloudUser} cloudBusy={cloudBusy} hasUnsyncedChanges={hasUnsyncedChanges} onCloudLogin={onCloudLogin} onCloudLogout={onCloudLogout} onCloudBackup={onCloudBackup} onCloudRestore={onCloudRestore} deletedTxs={deletedTxs} onRestoreTx={onRestoreTx} onPermanentDeleteTx={onPermanentDeleteTx}/>;
+    if(tab==="more") return <MoreScreen setSubPage={setSubPage} openUpgrade={openUpgrade} isPro={isPro} onLogout={onLocalLogout} onExportBackup={onExportBackup} onImportBackup={onImportBackup} cloudUser={cloudUser} cloudBusy={cloudBusy} hasUnsyncedChanges={hasUnsyncedChanges} onCloudLogin={onCloudLogin} onCloudLogout={onCloudLogout} onCloudBackup={onCloudBackup} onCloudRestore={onCloudRestore} deletedTxs={deletedTxs} onRestoreTx={onRestoreTx} onPermanentDeleteTx={onPermanentDeleteTx}/>;
     return null;
   };
 
