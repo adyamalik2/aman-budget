@@ -1,10 +1,14 @@
+import { useState } from "react";
 import {
   ArrowRightLeft, Bell, Calculator, ChevronRight, CreditCard, Crown,
-  FileDown, LayoutGrid, LogOut, Receipt, Shield, Star, Upload, Users
+  FileDown, LayoutGrid, LogOut, Receipt, RotateCcw, Shield, Star, Trash2, Upload, Users, X
 } from "lucide-react";
 import Header from "../components/layout/Header";
 import Badge from "../components/ui/Badge";
+import { STATUS } from "../constants/app";
 import { C } from "../constants/theme";
+import { fmtS } from "../utils/format";
+import { formatShortDate } from "../utils/period";
 
 const card = {background:"#fff", borderRadius:16, padding:"14px 16px", border:`1px solid ${C.borderL}`, boxShadow:"0 1px 4px rgba(0,0,0,0.03)"};
 
@@ -17,11 +21,16 @@ const MoreScreen = ({
   onImportBackup,
   cloudUser,
   cloudBusy = false,
+  hasUnsyncedChanges = false,
   onCloudLogin,
   onCloudLogout,
   onCloudBackup,
   onCloudRestore,
+  deletedTxs = [],
+  onRestoreTx,
+  onPermanentDeleteTx,
 }) => {
+  const [trashOpen, setTrashOpen] = useState(false);
   const items = [
     {icon:ArrowRightLeft, label:"Transfer Planner", desc:"Alokasi per anggota keluarga", action:()=>setSubPage("transfer"), color:C.blue},
     {icon:Calculator, label:"Kalkulator Zakat", desc:"Hitung zakat penghasilan 2.5%", action:()=>setSubPage("zakat"), color:C.pri},
@@ -56,6 +65,8 @@ const MoreScreen = ({
     opacity: cloudBusy ? 0.65 : 1,
     cursor: cloudBusy ? "not-allowed" : "pointer",
   };
+  const deletedList = [...deletedTxs].sort((a,b)=>(b.deletedAt || "").localeCompare(a.deletedAt || ""));
+  const cloudStatusLabel = hasUnsyncedChanges ? "Ada perubahan baru yang belum dibackup." : "Data terakhir sudah dibackup manual.";
 
   return (
     <div style={{flex:1, overflowY:"auto", paddingBottom:92, background:C.bg}}>
@@ -141,6 +152,7 @@ const MoreScreen = ({
               <p style={{fontSize:11, color:C.textM, margin:"2px 0 0", lineHeight:1.4}}>
                 {cloudUser ? `Login sebagai ${cloudUser.email || "Google User"}` : "Login Google untuk backup dan restore data ke cloud."}
               </p>
+              {cloudUser && <p style={{fontSize:10, color:hasUnsyncedChanges?C.gold:C.textL, margin:"4px 0 0"}}>{cloudStatusLabel}</p>}
             </div>
           </div>
           {!cloudUser ? (
@@ -167,10 +179,11 @@ const MoreScreen = ({
           {[
             {icon:CreditCard, label:"Kelola Rekening"},
             {icon:LayoutGrid, label:"Kategori & Grup"},
+            {icon:Trash2, label:"Tong Sampah", action:()=>setTrashOpen(true)},
             {icon:Shield, label:"Keamanan & Privasi"},
             {icon:Star, label:"Beri Rating"},
           ].map((it, i) => (
-            <button key={i} style={{width:"100%", padding:"12px 16px", background:"none", border:"none", borderTop: i>0?`1px solid ${C.borderL}`:"none", cursor:"pointer", display:"flex", alignItems:"center", gap:12, textAlign:"left"}}>
+            <button key={i} onClick={it.action} style={{width:"100%", padding:"12px 16px", background:"none", border:"none", borderTop: i>0?`1px solid ${C.borderL}`:"none", cursor:"pointer", display:"flex", alignItems:"center", gap:12, textAlign:"left"}}>
               <it.icon size={18} color={C.textM}/>
               <span style={{flex:1, fontSize:13, fontWeight:600, color:C.text}}>{it.label}</span>
               <ChevronRight size={14} color={C.textL}/>
@@ -186,6 +199,53 @@ const MoreScreen = ({
           AMAN Budget v1.0.0 · © 2026 AMAN Digital<br/>amandigital.web.id
         </p>
       </div>
+      {trashOpen && (
+        <div style={{position:"fixed", inset:0, background:"rgba(15,23,42,0.45)", zIndex:60, display:"flex", alignItems:"flex-end", justifyContent:"center"}}>
+          <div style={{width:"100%", maxWidth:430, maxHeight:"82vh", background:"#fff", borderTopLeftRadius:22, borderTopRightRadius:22, boxShadow:"0 -16px 40px rgba(15,23,42,0.22)", display:"flex", flexDirection:"column"}}>
+            <div style={{padding:"16px 16px 12px", borderBottom:`1px solid ${C.borderL}`, display:"flex", alignItems:"center", gap:10}}>
+              <div style={{width:38, height:38, borderRadius:12, background:"#fef2f2", color:C.red, display:"flex", alignItems:"center", justifyContent:"center"}}>
+                <Trash2 size={18}/>
+              </div>
+              <div style={{flex:1}}>
+                <p style={{fontSize:15, fontWeight:800, color:C.text, margin:0}}>Tong Sampah</p>
+                <p style={{fontSize:11, color:C.textM, margin:"2px 0 0"}}>{deletedList.length} transaksi terhapus</p>
+              </div>
+              <button type="button" onClick={()=>setTrashOpen(false)} aria-label="Tutup tong sampah" style={{width:34, height:34, borderRadius:10, border:"none", background:C.borderL, color:C.textM, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer"}}>
+                <X size={18}/>
+              </button>
+            </div>
+            <div style={{overflowY:"auto", padding:"8px 14px 18px", display:"flex", flexDirection:"column"}}>
+              {deletedList.length === 0 && (
+                <p style={{textAlign:"center", color:C.textL, fontSize:13, padding:"2.5rem 0"}}>Belum ada transaksi di tong sampah.</p>
+              )}
+              {deletedList.map(tx=>(
+                <div key={tx.id} style={{padding:"10px 0", borderBottom:`1px solid ${C.borderL}`, display:"grid", gridTemplateColumns:"48px minmax(0, 1fr)", gap:8}}>
+                  <div style={{fontSize:11, color:C.textM, fontWeight:800, textAlign:"center", lineHeight:1.2, paddingTop:2}}>{formatShortDate(tx.date)}</div>
+                  <div style={{minWidth:0}}>
+                    <div style={{display:"flex", justifyContent:"space-between", gap:8, alignItems:"flex-start"}}>
+                      <div style={{minWidth:0}}>
+                        <p style={{fontSize:13, fontWeight:800, color:C.text, margin:0, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>{tx.desc}</p>
+                        <p style={{fontSize:10, color:C.textL, margin:"2px 0 0"}}>{STATUS[tx.status]?.label || tx.status || "-"} Â· dihapus {formatShortDate(tx.deletedAt)}</p>
+                      </div>
+                      <span style={{fontSize:12, fontWeight:800, color:tx.type==="income"?C.pri:C.red, whiteSpace:"nowrap"}}>{tx.type==="income"?"+":"-"}{fmtS(tx.amt)}</span>
+                    </div>
+                    <div style={{display:"flex", gap:6, marginTop:8, flexWrap:"wrap"}}>
+                      <button type="button" onClick={()=>onRestoreTx?.(tx.id)} style={{border:"none", borderRadius:8, padding:"6px 8px", background:C.priL, color:C.priD, fontSize:11, fontWeight:800, cursor:"pointer", display:"flex", alignItems:"center", gap:5}}>
+                        <RotateCcw size={12}/> Restore
+                      </button>
+                      <button type="button" onClick={()=>{
+                        if(window.confirm("Hapus permanen transaksi ini? Data tidak bisa dikembalikan.")) onPermanentDeleteTx?.(tx.id);
+                      }} style={{border:"none", borderRadius:8, padding:"6px 8px", background:"#fef2f2", color:C.red, fontSize:11, fontWeight:800, cursor:"pointer", display:"flex", alignItems:"center", gap:5}}>
+                        <Trash2 size={12}/> Hapus Permanen
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

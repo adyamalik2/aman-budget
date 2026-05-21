@@ -4,6 +4,8 @@ import {
   Calculator,
   ChevronRight,
   Clock,
+  CloudOff,
+  CloudCheck,
   Crown,
   FileDown,
   PiggyBank,
@@ -21,9 +23,13 @@ import { getGoalDisplayedSaved } from "../utils/goals";
 
 const card = {background:"#fff", borderRadius:16, padding:"14px 16px", border:`1px solid ${C.borderL}`, boxShadow:"0 1px 4px rgba(0,0,0,0.03)"};
 
-const HomeScreen = ({txs, allTxs = [], goals = [], period, setPeriod, years, onCopyBudget, setTab, setSubPage, setEditTx, setAddOpen, openUpgrade, isPro = false, user}) => {
+const HomeScreen = ({txs, allTxs = [], goals = [], period, setPeriod, years, onCopyBudget, setTab, setSubPage, setEditTx, setAddOpen, openUpgrade, isPro = false, user, cloudUser = null, hasUnsyncedChanges = false, onCloudBackup}) => {
   const s = calcSummary(txs);
   const grps = calcGroups(txs);
+  const cloudMeta = hasUnsyncedChanges
+    ? {icon:CloudOff, label:"Ada perubahan belum dibackup", color:C.gold}
+    : {icon:CloudCheck, label:"Data sudah dibackup", color:"#bbf7d0"};
+  const CloudIcon = cloudMeta.icon;
 
   // Goal summary — pakai semua transaksi (allTxs) dan manual saved, konsisten dengan GoalsScreen
   const goalsWithSaved = goals.map(g => ({...g, _saved: getGoalDisplayedSaved(g, allTxs)}));
@@ -55,6 +61,11 @@ const HomeScreen = ({txs, allTxs = [], goals = [], period, setPeriod, years, onC
             <button onClick={openUpgrade} style={{background:`linear-gradient(135deg, ${C.gold}, #f59e0b)`, border:"none", borderRadius:20, padding:"6px 12px", cursor:"pointer", display:"flex", alignItems:"center", gap:5, color:"#fff", fontWeight:700, fontSize:11, boxShadow:"0 4px 12px rgba(217,119,6,0.4)"}}>
               <Crown size={13}/> Pro
             </button>
+            {cloudUser && (
+              <button type="button" onClick={onCloudBackup} title={cloudMeta.label} aria-label={cloudMeta.label} style={{width:36, height:36, background:"rgba(255,255,255,0.15)", border:"none", borderRadius:10, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff"}}>
+                <CloudIcon size={17} color={cloudMeta.color}/>
+              </button>
+            )}
             <button style={{width:36, height:36, background:"rgba(255,255,255,0.15)", border:"none", borderRadius:10, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", position:"relative"}}>
               <Bell size={17}/>
               <span style={{position:"absolute", top:7, right:7, width:7, height:7, background:C.gold, borderRadius:"50%"}}/>

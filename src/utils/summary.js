@@ -2,11 +2,12 @@ import { CHART_MONTH_SHORT } from "../constants/app";
 import { monthKey, normalizePeriod, validMonth, validYear } from "./period";
 
 export const calcSummary = txs => {
-  const incomePlan = txs.filter(x=>x.type==="income"&&x.status!=="batal").reduce((s,x)=>s+x.amt,0);
-  const totalIncome = txs.filter(x=>x.type==="income"&&x.status==="selesai").reduce((s,x)=>s+x.amt,0);
-  const estExp = txs.filter(x=>x.type==="expense"&&x.status!=="batal").reduce((s,x)=>s+x.amt,0);
-  const paid = txs.filter(x=>x.type==="expense"&&x.status==="selesai").reduce((s,x)=>s+x.amt,0);
-  const unpaid = txs.filter(x=>x.type==="expense"&&x.status==="belum_selesai").reduce((s,x)=>s+x.amt,0);
+  const active = txs.filter(x=>!x.deletedAt);
+  const incomePlan = active.filter(x=>x.type==="income"&&x.status!=="batal").reduce((s,x)=>s+x.amt,0);
+  const totalIncome = active.filter(x=>x.type==="income"&&x.status==="selesai").reduce((s,x)=>s+x.amt,0);
+  const estExp = active.filter(x=>x.type==="expense"&&x.status!=="batal").reduce((s,x)=>s+x.amt,0);
+  const paid = active.filter(x=>x.type==="expense"&&x.status==="selesai").reduce((s,x)=>s+x.amt,0);
+  const unpaid = active.filter(x=>x.type==="expense"&&x.status==="belum_selesai").reduce((s,x)=>s+x.amt,0);
   return {
     totalIncome, incomePlan, estExp, paid, unpaid,
     actBal: totalIncome - paid,
@@ -17,7 +18,7 @@ export const calcSummary = txs => {
 
 export const calcGroups = txs => {
   const r = {};
-  txs.filter(x=>x.type==="expense"&&x.status!=="batal").forEach(x=>{
+  txs.filter(x=>!x.deletedAt&&x.type==="expense"&&x.status!=="batal").forEach(x=>{
     const k = x.grp || "lain_lain";
     if(!r[k]) r[k] = {budget:0, paid:0, unpaid:0};
     r[k].budget += x.amt;
@@ -29,7 +30,7 @@ export const calcGroups = txs => {
 
 const calcWeekData = txs => {
   const weeks = Array.from({length:5}, (_,i)=>({w:`M${i+1}`, in:0, out:0}));
-  txs.forEach(tx=>{
+  txs.filter(tx=>!tx.deletedAt).forEach(tx=>{
     const day = Number((tx.date || "").slice(8, 10));
     if(!day) return;
     const idx = Math.min(Math.floor((day - 1) / 7), 4);
@@ -53,7 +54,7 @@ export const calcCashflowChartData = (txs, period) => {
   }
 
   const byMonth = new Map(months.map(month=>[month.key, month]));
-  txs.forEach(tx=>{
+  txs.filter(tx=>!tx.deletedAt).forEach(tx=>{
     const [year, month] = (tx.date || "").split("-").map(Number);
     if(!validYear(year)||!validMonth(month)) return;
     const bucket = byMonth.get(monthKey(year, month));

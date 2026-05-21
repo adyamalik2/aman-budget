@@ -18,7 +18,7 @@ export const isTxMatchGoal = (tx, goal) => {
 };
 
 export const calcGoalTransactionSaved = (txs, goal) => (txs || []).reduce((sum, tx) => {
-  if(!isGoalCompletedTx(tx) || !isTxMatchGoal(tx, goal)) return sum;
+  if(tx?.deletedAt || !isGoalCompletedTx(tx) || !isTxMatchGoal(tx, goal)) return sum;
   const amount = Number(tx?.amt);
   return Number.isFinite(amount) && amount > 0 ? sum + amount : sum;
 }, 0);

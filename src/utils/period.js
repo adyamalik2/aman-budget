@@ -58,7 +58,7 @@ export const getPeriodYears = (txs, period) => {
   const p = normalizePeriod(period);
   const currentYear = new Date().getFullYear();
   const years = new Set([currentYear, currentYear + 1, p.year, p.startYear, p.endYear]);
-  txs.forEach(tx=>{
+  txs.filter(tx=>!tx.deletedAt).forEach(tx=>{
     const year = Number((tx.date || "").slice(0, 4));
     if(validYear(year)) years.add(year);
   });
@@ -79,8 +79,9 @@ export const copyBudgetFromPreviousMonth = (txs, period) => {
   const p = normalizePeriod(period);
   const prev = getPrevMonthYear(p.month, p.year);
   const txKey = tx => [tx.type, tx.grp || "", tx.cat || "", tx.desc || "", Number(tx.amt) || 0].join("|");
-  const source = txs.filter(tx=>tx.status!=="batal"&&isTxInPeriod(tx, {mode:"month", month:prev.month, year:prev.year}));
-  const targetKeys = new Set(txs.filter(tx=>isTxInPeriod(tx, {mode:"month", month:p.month, year:p.year})).map(txKey));
+  const active = txs.filter(tx=>!tx.deletedAt);
+  const source = active.filter(tx=>tx.status!=="batal"&&isTxInPeriod(tx, {mode:"month", month:prev.month, year:prev.year}));
+  const targetKeys = new Set(active.filter(tx=>isTxInPeriod(tx, {mode:"month", month:p.month, year:p.year})).map(txKey));
   const items = source
     .filter(tx=>!targetKeys.has(txKey(tx)))
     .map((tx,i)=>({
@@ -92,9 +93,9 @@ export const copyBudgetFromPreviousMonth = (txs, period) => {
   return {items, sourceCount:source.length, prev};
 };
 
-export const getTransactionsByPeriod = (txs, month, year) => txs.filter(tx=>isTxInPeriod(tx, {mode:"month", month, year}));
+export const getTransactionsByPeriod = (txs, month, year) => txs.filter(tx=>!tx.deletedAt&&isTxInPeriod(tx, {mode:"month", month, year}));
 
-export const getTransactionsByRange = (txs, period) => txs.filter(tx=>isTxInPeriod(tx, {...normalizePeriod(period), mode:"range"}));
+export const getTransactionsByRange = (txs, period) => txs.filter(tx=>!tx.deletedAt&&isTxInPeriod(tx, {...normalizePeriod(period), mode:"range"}));
 
 export const getDeletePeriodLabel = period => formatPeriodLabel(period);
 

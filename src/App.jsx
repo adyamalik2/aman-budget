@@ -50,6 +50,7 @@ export default function App() {
   const [isPro, setIsPro] = useState(() => loadStored(STORAGE_KEYS.isPro, false, v=>v===true||v===false));
   const [cloudUser, setCloudUser] = useState(null);
   const [cloudBusy, setCloudBusy] = useState(false);
+  const [hasUnsyncedChanges, setHasUnsyncedChanges] = useState(false);
 
   useEffect(()=>{ saveStored(STORAGE_KEYS.txs, txs); }, [txs]);
   useEffect(()=>{ saveStored(STORAGE_KEYS.goals, goals); }, [goals]);
@@ -69,38 +70,83 @@ export default function App() {
     return unsubscribe;
   }, []);
 
-  const periodTxs = useMemo(()=>txs.filter(tx=>isTxInPeriod(tx, period)), [txs, period]);
-  const periodYears = useMemo(()=>getPeriodYears(txs, period), [txs, period]);
+  const activeTxs = useMemo(()=>txs.filter(tx=>!tx.deletedAt), [txs]);
+  const deletedTxs = useMemo(()=>txs.filter(tx=>tx.deletedAt), [txs]);
+  const periodTxs = useMemo(()=>activeTxs.filter(tx=>isTxInPeriod(tx, period)), [activeTxs, period]);
+  const periodYears = useMemo(()=>getPeriodYears(activeTxs, period), [activeTxs, period]);
+  const cloudBackupPayload = useMemo(()=>({
+    transactions: txs,
+    goals,
+    periodSetting: normalizePeriod(period),
+    user,
+  }), [txs, goals, period, user]);
+  const updatePeriod = nextPeriod => {
+    setHasUnsyncedChanges(true);
+    setPeriod(nextPeriod);
+  };
 
   const onSave = tx => setTxs(p=>{
+    setHasUnsyncedChanges(true);
     const i = p.findIndex(x=>x.id===tx.id);
     if(i>=0) {const n=[...p]; n[i]=tx; return n;}
     return [...p, tx];
   });
-  const onDelete = id => setTxs(p=>p.filter(x=>x.id!==id));
-  const onDone = id => setTxs(p=>p.map(x=>x.id===id?{...x, status:"selesai"}:x));
-  const onDeletePeriod = periodToDelete => setTxs(p=>deleteTransactionsByPeriod(p, periodToDelete).next);
+  const onDelete = id => {
+    const deletedAt = new Date().toISOString();
+    setHasUnsyncedChanges(true);
+    setTxs(p=>p.map(x=>x.id===id ? {...x, deletedAt} : x));
+  };
+  const onDone = id => {
+    setHasUnsyncedChanges(true);
+    setTxs(p=>p.map(x=>x.id===id?{...x, status:"selesai"}:x));
+  };
+  const onDeletePeriod = periodToDelete => {
+    const deletedAt = new Date().toISOString();
+    setHasUnsyncedChanges(true);
+    setTxs(p=>{
+      const result = deleteTransactionsByPeriod(p.filter(tx=>!tx.deletedAt), periodToDelete);
+      const ids = new Set(result.deleted.map(tx=>tx.id));
+      return p.map(tx=>ids.has(tx.id) ? {...tx, deletedAt} : tx);
+    });
+  };
+  const onRestoreTx = id => {
+    setHasUnsyncedChanges(true);
+    setTxs(p=>p.map(tx=>{
+      if(tx.id !== id) return tx;
+      const restored = {...tx};
+      delete restored.deletedAt;
+      return restored;
+    }));
+  };
+  const onPermanentDeleteTx = id => {
+    setHasUnsyncedChanges(true);
+    setTxs(p=>p.filter(tx=>tx.id!==id));
+  };
   const onAddGoalSaving = (goal, amount) => {
     const value = Number(amount);
     if(!goal?.id || !Number.isFinite(value) || value <= 0) return;
+    setHasUnsyncedChanges(true);
     setGoals(p=>p.map(g=>g.id===goal.id ? {...g, saved:Number(g.saved||0)+value} : g));
   };
   const onAddGoal = ({name, target}) => {
+    setHasUnsyncedChanges(true);
     setGoals(p => {
       const idx = p.length;
       return [...p, {id:Date.now().toString(), name:name.trim(), target:Number(target), saved:0, deadline:"", icon:GOAL_ICONS[idx%GOAL_ICONS.length], color:GOAL_COLORS[idx%GOAL_COLORS.length]}];
     });
   };
   const onEditGoal = (id, {name, target}) => {
+    setHasUnsyncedChanges(true);
     setGoals(p=>p.map(g=>g.id===id ? {...g, name:name.trim(), target:Number(target)} : g));
   };
   const onDeleteGoal = id => {
+    setHasUnsyncedChanges(true);
     setGoals(p=>p.filter(g=>g.id!==id));
   };
   const onCopyBudget = () => {
     const p = normalizePeriod(period);
     if(p.mode !== "month") return;
-    const {items, sourceCount, prev} = copyBudgetFromPreviousMonth(txs, p);
+    const {items, sourceCount, prev} = copyBudgetFromPreviousMonth(activeTxs, p);
     if(sourceCount === 0) {
       alert(`Tidak ada budget dari ${formatMonthYear(prev.month, prev.year)} untuk dicopy.`);
       return;
@@ -109,6 +155,7 @@ export default function App() {
       alert("Budget bulan lalu sudah pernah dicopy.");
       return;
     }
+    setHasUnsyncedChanges(true);
     setTxs(prevTxs=>[...prevTxs, ...items]);
     alert(`${items.length} item berhasil dicopy dari ${formatMonthYear(prev.month, prev.year)}.`);
   };
@@ -157,6 +204,7 @@ export default function App() {
       if(data.goals !== undefined) setGoals(data.goals);
       if(Object.prototype.hasOwnProperty.call(data, "user")) setUser(data.user);
       if(data.period !== undefined) setPeriod(normalizePeriod(data.period));
+      setHasUnsyncedChanges(true);
       alert("Backup berhasil diimport.");
     } catch {
       alert("Gagal membaca file backup. Pastikan file JSON tidak rusak.");
@@ -195,7 +243,11 @@ export default function App() {
     setCloudBusy(true);
     try {
       if(Capacitor.isNativePlatform()) {
-        await GoogleSignIn.signOut();
+        try {
+          await GoogleSignIn.signOut();
+        } catch {
+          // Firebase sign out tetap dijalankan walau native credential state sudah kosong.
+        }
       }
       await signOut(auth);
       alert("Logout Google berhasil.");
@@ -216,12 +268,8 @@ export default function App() {
     }
     setCloudBusy(true);
     try {
-      await backupToCloud(cloudUser.uid, {
-        transactions: txs,
-        goals,
-        periodSetting: normalizePeriod(period),
-        user,
-      });
+      await backupToCloud(cloudUser.uid, cloudBackupPayload);
+      setHasUnsyncedChanges(false);
       alert("Backup cloud berhasil.");
     } catch {
       alert("Backup cloud gagal.");
@@ -255,6 +303,7 @@ export default function App() {
       if(data.periodSetting !== undefined) setPeriod(normalizePeriod(data.periodSetting));
       else if(data.period !== undefined) setPeriod(normalizePeriod(data.period));
       if(data.user && typeof data.user === "object") setUser(data.user);
+      setHasUnsyncedChanges(false);
       alert("Restore cloud berhasil.");
     } catch {
       alert("Restore cloud gagal.");
@@ -302,14 +351,14 @@ export default function App() {
 
   const renderScreen = () => {
     if(subPage==="upgrade") return <UpgradeScreen setSubPage={setSubPage} isPro={isPro} onActivatePro={onActivatePro} onDeactivatePro={onDeactivatePro}/>;
-    if(subPage==="transfer") return <TransferScreen txs={txs} setSubPage={setSubPage}/>;
+    if(subPage==="transfer") return <TransferScreen txs={activeTxs} setSubPage={setSubPage}/>;
     if(subPage==="zakat") return <ZakatScreen setSubPage={setSubPage}/>;
-    if(subPage==="tx-list") return <TxListScreen txs={periodTxs} allTxs={txs} goals={goals} period={period} setPeriod={setPeriod} years={periodYears} onCopyBudget={onCopyBudget} onDeletePeriod={onDeletePeriod} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} onDelete={onDelete} onDone={onDone}/>;
-    if(subPage==="share") return <ShareScreen txs={periodTxs} allTxs={txs} goals={goals} period={period} setSubPage={setSubPage}/>;
-    if(tab==="home") return <HomeScreen txs={periodTxs} allTxs={txs} goals={goals} period={period} setPeriod={setPeriod} years={periodYears} onCopyBudget={onCopyBudget} setTab={setTab} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} openUpgrade={openUpgrade} isPro={isPro} user={user}/>;
-    if(tab==="reports") return <ReportsScreen txs={periodTxs} period={period} setPeriod={setPeriod} years={periodYears} openUpgrade={openUpgrade}/>;
-    if(tab==="goals-tab") return <GoalsScreen goals={goals} txs={txs} isPro={isPro} openUpgrade={openUpgrade} onAddSaving={onAddGoalSaving} onAddGoal={onAddGoal} onEditGoal={onEditGoal} onDeleteGoal={onDeleteGoal}/>;
-    if(tab==="more") return <MoreScreen setSubPage={setSubPage} openUpgrade={openUpgrade} isPro={isPro} onLogout={()=>setUser(null)} onExportBackup={onExportBackup} onImportBackup={onImportBackup} cloudUser={cloudUser} cloudBusy={cloudBusy} onCloudLogin={onCloudLogin} onCloudLogout={onCloudLogout} onCloudBackup={onCloudBackup} onCloudRestore={onCloudRestore}/>;
+    if(subPage==="tx-list") return <TxListScreen txs={periodTxs} allTxs={activeTxs} goals={goals} period={period} setPeriod={updatePeriod} years={periodYears} onCopyBudget={onCopyBudget} onDeletePeriod={onDeletePeriod} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} onDelete={onDelete} onDone={onDone}/>;
+    if(subPage==="share") return <ShareScreen txs={periodTxs} allTxs={activeTxs} goals={goals} period={period} setSubPage={setSubPage}/>;
+    if(tab==="home") return <HomeScreen txs={periodTxs} allTxs={activeTxs} goals={goals} period={period} setPeriod={updatePeriod} years={periodYears} onCopyBudget={onCopyBudget} setTab={setTab} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} openUpgrade={openUpgrade} isPro={isPro} user={user} cloudUser={cloudUser} hasUnsyncedChanges={hasUnsyncedChanges} onCloudBackup={onCloudBackup}/>;
+    if(tab==="reports") return <ReportsScreen txs={periodTxs} period={period} setPeriod={updatePeriod} years={periodYears} openUpgrade={openUpgrade}/>;
+    if(tab==="goals-tab") return <GoalsScreen goals={goals} txs={activeTxs} isPro={isPro} openUpgrade={openUpgrade} onAddSaving={onAddGoalSaving} onAddGoal={onAddGoal} onEditGoal={onEditGoal} onDeleteGoal={onDeleteGoal}/>;
+    if(tab==="more") return <MoreScreen setSubPage={setSubPage} openUpgrade={openUpgrade} isPro={isPro} onLogout={()=>setUser(null)} onExportBackup={onExportBackup} onImportBackup={onImportBackup} cloudUser={cloudUser} cloudBusy={cloudBusy} hasUnsyncedChanges={hasUnsyncedChanges} onCloudLogin={onCloudLogin} onCloudLogout={onCloudLogout} onCloudBackup={onCloudBackup} onCloudRestore={onCloudRestore} deletedTxs={deletedTxs} onRestoreTx={onRestoreTx} onPermanentDeleteTx={onPermanentDeleteTx}/>;
     return null;
   };
 
