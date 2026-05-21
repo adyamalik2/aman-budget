@@ -8,7 +8,20 @@ import { C } from "../constants/theme";
 
 const card = {background:"#fff", borderRadius:16, padding:"14px 16px", border:`1px solid ${C.borderL}`, boxShadow:"0 1px 4px rgba(0,0,0,0.03)"};
 
-const MoreScreen = ({setSubPage, openUpgrade, isPro = false, onLogout, onExportBackup, onImportBackup}) => {
+const MoreScreen = ({
+  setSubPage,
+  openUpgrade,
+  isPro = false,
+  onLogout,
+  onExportBackup,
+  onImportBackup,
+  cloudUser,
+  cloudBusy = false,
+  onCloudLogin,
+  onCloudLogout,
+  onCloudBackup,
+  onCloudRestore,
+}) => {
   const items = [
     {icon:ArrowRightLeft, label:"Transfer Planner", desc:"Alokasi per anggota keluarga", action:()=>setSubPage("transfer"), color:C.blue},
     {icon:Calculator, label:"Kalkulator Zakat", desc:"Hitung zakat penghasilan 2.5%", action:()=>setSubPage("zakat"), color:C.pri},
@@ -37,6 +50,11 @@ const MoreScreen = ({setSubPage, openUpgrade, isPro = false, onLogout, onExportB
     const file = e.target.files?.[0];
     e.target.value = "";
     if(file) onImportBackup(file);
+  };
+  const cloudBtnStyle = {
+    ...backupBtnStyle,
+    opacity: cloudBusy ? 0.65 : 1,
+    cursor: cloudBusy ? "not-allowed" : "pointer",
   };
 
   return (
@@ -110,6 +128,38 @@ const MoreScreen = ({setSubPage, openUpgrade, isPro = false, onLogout, onExportB
               <input type="file" accept="application/json,.json" onChange={handleImportFile} style={{display:"none"}}/>
             </label>
           </div>
+        </div>
+
+        {/* Cloud backup */}
+        <div style={card}>
+          <div style={{display:"flex", alignItems:"flex-start", gap:10, marginBottom:12}}>
+            <div style={{width:38, height:38, borderRadius:11, background:C.blue+"15", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0}}>
+              <Shield size={18} color={C.blue}/>
+            </div>
+            <div style={{flex:1}}>
+              <p style={{fontSize:13, fontWeight:800, color:C.text, margin:0}}>Cloud Backup</p>
+              <p style={{fontSize:11, color:C.textM, margin:"2px 0 0", lineHeight:1.4}}>
+                {cloudUser ? `Login sebagai ${cloudUser.email || "Google User"}` : "Login Google untuk backup dan restore data ke cloud."}
+              </p>
+            </div>
+          </div>
+          {!cloudUser ? (
+            <button disabled={cloudBusy} onClick={onCloudLogin} style={{...cloudBtnStyle, width:"100%", color:C.blue, borderColor:C.blue}}>
+              <Shield size={15}/> {cloudBusy ? "Memproses..." : "Login Google"}
+            </button>
+          ) : (
+            <div style={{display:"flex", gap:8, flexWrap:"wrap"}}>
+              <button disabled={cloudBusy} onClick={onCloudBackup} style={{...cloudBtnStyle, color:C.pri, borderColor:C.pri}}>
+                <Upload size={15}/> Backup Cloud
+              </button>
+              <button disabled={cloudBusy} onClick={onCloudRestore} style={{...cloudBtnStyle, color:C.blue, borderColor:C.blue}}>
+                <FileDown size={15}/> Restore Cloud
+              </button>
+              <button disabled={cloudBusy} onClick={onCloudLogout} style={{...cloudBtnStyle, color:C.red, borderColor:C.red}}>
+                <LogOut size={15}/> Logout Google
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Settings */}

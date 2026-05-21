@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
+import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
 import BottomNav from "./components/layout/BottomNav";
 import HomeScreen from "./screens/HomeScreen";
 import GoalsScreen from "./screens/GoalsScreen";
@@ -16,6 +17,8 @@ import AddSheet from "./features/transactions/AddSheet";
 import { C } from "./constants/theme";
 import { STORAGE_KEYS } from "./constants/app";
 import { INIT_GOALS, INIT_TX } from "./data/initialData";
+import { auth, googleProvider, isFirebaseConfigured } from "./lib/firebase";
+import { backupToCloud, restoreFromCloud } from "./lib/cloudBackup";
 import { loadStored, removeStored, saveStored } from "./utils/storage";
 import { formatBackupDate, isJsonFile, isValidBackupData } from "./utils/backup";
 import {
@@ -43,6 +46,8 @@ export default function App() {
   const [goals, setGoals] = useState(() => loadStored(STORAGE_KEYS.goals, INIT_GOALS, Array.isArray));
   const [period, setPeriod] = useState(() => normalizePeriod(loadStored(STORAGE_KEYS.period, getDefaultPeriod(), v=>v&&typeof v==="object"&&!Array.isArray(v))));
   const [isPro, setIsPro] = useState(() => loadStored(STORAGE_KEYS.isPro, false, v=>v===true||v===false));
+  const [cloudUser, setCloudUser] = useState(null);
+  const [cloudBusy, setCloudBusy] = useState(false);
 
   useEffect(()=>{ saveStored(STORAGE_KEYS.txs, txs); }, [txs]);
   useEffect(()=>{ saveStored(STORAGE_KEYS.goals, goals); }, [goals]);
@@ -52,6 +57,15 @@ export default function App() {
     if(user) saveStored(STORAGE_KEYS.user, user);
     else removeStored(STORAGE_KEYS.user);
   }, [user]);
+  useEffect(() => {
+    if(!isFirebaseConfigured || !auth) {
+      return undefined;
+    }
+    const unsubscribe = onAuthStateChanged(auth, firebaseUser => {
+      setCloudUser(firebaseUser);
+    });
+    return unsubscribe;
+  }, []);
 
   const periodTxs = useMemo(()=>txs.filter(tx=>isTxInPeriod(tx, period)), [txs, period]);
   const periodYears = useMemo(()=>getPeriodYears(txs, period), [txs, period]);
@@ -146,6 +160,93 @@ export default function App() {
       alert("Gagal membaca file backup. Pastikan file JSON tidak rusak.");
     }
   };
+  const onCloudLogin = async () => {
+    if(!isFirebaseConfigured || !auth || !googleProvider) {
+      alert("Firebase belum terkonfigurasi. Restart dev server atau cek .env.local.");
+      return;
+    }
+    setCloudBusy(true);
+    try {
+      await signInWithPopup(auth, googleProvider);
+      alert("Login Google berhasil.");
+    } catch {
+      alert("Login Google gagal.");
+    } finally {
+      setCloudBusy(false);
+    }
+  };
+  const onCloudLogout = async () => {
+    if(!isFirebaseConfigured || !auth) {
+      alert("Firebase belum terkonfigurasi. Restart dev server atau cek .env.local.");
+      return;
+    }
+    setCloudBusy(true);
+    try {
+      await signOut(auth);
+      alert("Logout Google berhasil.");
+    } catch {
+      alert("Logout Google gagal.");
+    } finally {
+      setCloudBusy(false);
+    }
+  };
+  const onCloudBackup = async () => {
+    if(!isFirebaseConfigured) {
+      alert("Firebase belum terkonfigurasi. Restart dev server atau cek .env.local.");
+      return;
+    }
+    if(!cloudUser) {
+      alert("Login Google dulu untuk backup cloud.");
+      return;
+    }
+    setCloudBusy(true);
+    try {
+      await backupToCloud(cloudUser.uid, {
+        transactions: txs,
+        goals,
+        periodSetting: normalizePeriod(period),
+        user,
+      });
+      alert("Backup cloud berhasil.");
+    } catch {
+      alert("Backup cloud gagal.");
+    } finally {
+      setCloudBusy(false);
+    }
+  };
+  const onCloudRestore = async () => {
+    if(!isFirebaseConfigured) {
+      alert("Firebase belum terkonfigurasi. Restart dev server atau cek .env.local.");
+      return;
+    }
+    if(!cloudUser) {
+      alert("Login Google dulu untuk restore cloud.");
+      return;
+    }
+    setCloudBusy(true);
+    try {
+      const data = await restoreFromCloud(cloudUser.uid);
+      if(!data) {
+        alert("Belum ada backup cloud.");
+        return;
+      }
+
+      const restoredTxs = Array.isArray(data.transactions) ? data.transactions : [];
+      const ok = window.confirm(`Restore cloud akan mengganti ${txs.length} transaksi saat ini dengan ${restoredTxs.length} transaksi cloud. Lanjutkan?`);
+      if(!ok) return;
+
+      setTxs(restoredTxs.map(tx=>({...tx, amt:Number(tx.amt)})));
+      if(Array.isArray(data.goals)) setGoals(data.goals);
+      if(data.periodSetting !== undefined) setPeriod(normalizePeriod(data.periodSetting));
+      else if(data.period !== undefined) setPeriod(normalizePeriod(data.period));
+      if(data.user && typeof data.user === "object") setUser(data.user);
+      alert("Restore cloud berhasil.");
+    } catch {
+      alert("Restore cloud gagal.");
+    } finally {
+      setCloudBusy(false);
+    }
+  };
   const openUpgrade = () => setSubPage("upgrade");
   const onActivatePro   = () => { setIsPro(true);  alert("Mode Pro sementara aktif untuk testing."); };
   const onDeactivatePro = () => setIsPro(false);
@@ -193,7 +294,7 @@ export default function App() {
     if(tab==="home") return <HomeScreen txs={periodTxs} allTxs={txs} goals={goals} period={period} setPeriod={setPeriod} years={periodYears} onCopyBudget={onCopyBudget} setTab={setTab} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} openUpgrade={openUpgrade} isPro={isPro} user={user}/>;
     if(tab==="reports") return <ReportsScreen txs={periodTxs} period={period} setPeriod={setPeriod} years={periodYears} openUpgrade={openUpgrade}/>;
     if(tab==="goals-tab") return <GoalsScreen goals={goals} txs={txs} isPro={isPro} openUpgrade={openUpgrade} onAddSaving={onAddGoalSaving} onAddGoal={onAddGoal} onEditGoal={onEditGoal} onDeleteGoal={onDeleteGoal}/>;
-    if(tab==="more") return <MoreScreen setSubPage={setSubPage} openUpgrade={openUpgrade} isPro={isPro} onLogout={()=>setUser(null)} onExportBackup={onExportBackup} onImportBackup={onImportBackup}/>;
+    if(tab==="more") return <MoreScreen setSubPage={setSubPage} openUpgrade={openUpgrade} isPro={isPro} onLogout={()=>setUser(null)} onExportBackup={onExportBackup} onImportBackup={onImportBackup} cloudUser={cloudUser} cloudBusy={cloudBusy} onCloudLogin={onCloudLogin} onCloudLogout={onCloudLogout} onCloudBackup={onCloudBackup} onCloudRestore={onCloudRestore}/>;
     return null;
   };
 

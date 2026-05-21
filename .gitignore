@@ -34,3 +34,7 @@ android/app/build/
 /android/app/build/
 *.keystore
 *.jks
+
+.env
+.env.local
+.env.*.local
