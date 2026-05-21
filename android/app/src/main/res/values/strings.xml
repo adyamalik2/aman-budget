@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">AMAN Budget</string>
+    <string name="title_activity_main">AMAN Budget</string>
+    <string name="package_name">id.web.amandigital.amanbudget</string>
+    <string name="custom_url_scheme">id.web.amandigital.amanbudget</string>
+</resources>
