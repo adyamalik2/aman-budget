@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect } from "react";
 import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
-import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
+import { GoogleSignIn } from "@capawesome/capacitor-google-sign-in";
+import { GoogleAuthProvider, onAuthStateChanged, signInWithCredential, signInWithPopup, signOut } from "firebase/auth";
 import BottomNav from "./components/layout/BottomNav";
 import HomeScreen from "./screens/HomeScreen";
 import GoalsScreen from "./screens/GoalsScreen";
@@ -34,6 +35,7 @@ import {
 // ─── GOAL DEFAULTS ───
 const GOAL_COLORS = ["#16a34a","#2563eb","#d97706","#dc2626","#7c3aed","#0891b2"];
 const GOAL_ICONS  = ["plane","grad","shield"];
+const GOOGLE_WEB_CLIENT_ID = "755957066136-nk0gmi6pf6mqo22r7iu2tr2p6nu6rf4c.apps.googleusercontent.com";
 
 // ─── APP ───
 export default function App() {
@@ -161,17 +163,23 @@ export default function App() {
     }
   };
   const onCloudLogin = async () => {
-    if(Capacitor.isNativePlatform()) {
-      alert("Fitur Backup Cloud (Login Google) saat ini baru tersedia di versi Web/Browser. Versi Aplikasi akan menyusul di pembaruan berikutnya.");
-      return;
-    }
     if(!isFirebaseConfigured || !auth || !googleProvider) {
       alert("Firebase belum terkonfigurasi. Restart dev server atau cek .env.local.");
       return;
     }
     setCloudBusy(true);
     try {
-      await signInWithPopup(auth, googleProvider);
+      if(Capacitor.isNativePlatform()) {
+        await GoogleSignIn.initialize({
+          clientId: GOOGLE_WEB_CLIENT_ID,
+        });
+        const googleUser = await GoogleSignIn.signIn();
+        if(!googleUser.idToken) throw new Error("Google ID token kosong.");
+        const credential = GoogleAuthProvider.credential(googleUser.idToken);
+        await signInWithCredential(auth, credential);
+      } else {
+        await signInWithPopup(auth, googleProvider);
+      }
       alert("Login Google berhasil.");
     } catch {
       alert("Login Google gagal.");
@@ -186,6 +194,9 @@ export default function App() {
     }
     setCloudBusy(true);
     try {
+      if(Capacitor.isNativePlatform()) {
+        await GoogleSignIn.signOut();
+      }
       await signOut(auth);
       alert("Logout Google berhasil.");
     } catch {
