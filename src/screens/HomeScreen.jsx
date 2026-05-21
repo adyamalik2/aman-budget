@@ -21,7 +21,7 @@ import { getGoalDisplayedSaved } from "../utils/goals";
 
 const card = {background:"#fff", borderRadius:16, padding:"14px 16px", border:`1px solid ${C.borderL}`, boxShadow:"0 1px 4px rgba(0,0,0,0.03)"};
 
-const HomeScreen = ({txs, allTxs = [], goals = [], period, setPeriod, years, onCopyBudget, setTab, setSubPage, setEditTx, setAddOpen, openUpgrade, user}) => {
+const HomeScreen = ({txs, allTxs = [], goals = [], period, setPeriod, years, onCopyBudget, setTab, setSubPage, setEditTx, setAddOpen, openUpgrade, isPro = false, user}) => {
   const s = calcSummary(txs);
   const grps = calcGroups(txs);
 
@@ -94,7 +94,7 @@ const HomeScreen = ({txs, allTxs = [], goals = [], period, setPeriod, years, onC
             {icon:ArrowRightLeft, label:"Transfer", color:C.blue, action:()=>setSubPage("transfer")},
             {icon:Calculator, label:"Zakat", color:C.pri, action:()=>setSubPage("zakat")},
             {icon:PiggyBank, label:"Goals", color:C.gold, action:()=>{setTab("goals-tab"); setSubPage(null);}},
-            {icon:FileDown, label:"Export", color:"#8b5cf6", action:openUpgrade},
+            {icon:FileDown, label:"Export", color:"#8b5cf6", action:isPro ? ()=>setSubPage("share") : openUpgrade},
           ].map((q,i)=>(
             <button key={i} onClick={q.action} style={{background:"#fff", border:`1px solid ${C.borderL}`, borderRadius:14, padding:"10px 4px", cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", gap:4}}>
               <div style={{width:36, height:36, borderRadius:10, background:q.color+"15", display:"flex", alignItems:"center", justifyContent:"center"}}>

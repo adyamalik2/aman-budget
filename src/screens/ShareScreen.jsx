@@ -1,5 +1,8 @@
 import { useMemo, useRef, useState } from "react";
 import { Check, Copy, FileDown, ImageDown, Send, Shield, Sparkles } from "lucide-react";
+import { Capacitor } from "@capacitor/core";
+import { Directory, Filesystem } from "@capacitor/filesystem";
+import { Share } from "@capacitor/share";
 import { toJpeg } from "html-to-image";
 import Header from "../components/layout/Header";
 import { GROUPS, STATUS } from "../constants/app";
@@ -10,6 +13,8 @@ import { formatPeriodLabel, formatShortDate } from "../utils/period";
 import { calcGroups, calcSummary } from "../utils/summary";
 
 const resolveTxGrp = tx => (tx.grp && GROUPS[tx.grp]) ? tx.grp : "lain_lain";
+const isNativeApp = () => Capacitor.getPlatform() !== "web";
+const safeActionPad = "calc(24px + env(safe-area-inset-bottom))";
 
 // ── Ultra-compact table cell styles ──
 const TH = {padding:"2px 4px", textAlign:"left", color:"#fff", fontWeight:700, fontSize:7, lineHeight:1.1};
@@ -26,6 +31,35 @@ const calcSubtotal = grpTxs => ({
   belum:    grpTxs.filter(tx => tx.status === "belum_selesai").reduce((s, tx) => s + tx.amt, 0),
   estimasi: grpTxs.filter(tx => tx.status === "estimasi").reduce((s, tx) => s + tx.amt, 0),
 });
+
+const downloadJpgInBrowser = (dataUrl, fname) => {
+  const a = document.createElement("a");
+  a.href = dataUrl;
+  a.download = fname;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+};
+
+const shareJpgInNativeApp = async (dataUrl, fname) => {
+  const base64 = dataUrl.split(",")[1];
+  if (!base64) throw new Error("Invalid JPG data");
+
+  const saved = await Filesystem.writeFile({
+    path: fname,
+    data: base64,
+    directory: Directory.Cache,
+  });
+  const canShare = await Share.canShare();
+  if (!canShare.value) throw new Error("Share is not available");
+
+  await Share.share({
+    title: "AMAN Budget",
+    text: "Laporan AMAN Budget",
+    files: [saved.uri],
+    dialogTitle: "Bagikan laporan JPG",
+  });
+};
 
 const GrpTable = ({grpKey, txList, goals}) => {
   const sub     = calcSubtotal(txList);
@@ -194,6 +228,14 @@ const ShareScreen = ({txs, allTxs = [], goals = [], period = null, setSubPage}) 
     window.open(`https://wa.me/?text=${encodeURIComponent(waText)}`, "_blank");
   };
 
+  const printPdf = () => {
+    if (isNativeApp()) {
+      alert("Print/PDF belum didukung stabil di APK Android. Gunakan Export JPG untuk membagikan laporan dari HP.");
+      return;
+    }
+    window.print();
+  };
+
   const exportJpg = async () => {
     if (!reportRef.current) return;
     setExportingJpg(true);
@@ -207,12 +249,11 @@ const ShareScreen = ({txs, allTxs = [], goals = [], period = null, setSubPage}) 
       const now = new Date();
       const pad = n => String(n).padStart(2, "0");
       const fname = `aman-budget-report-${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}.jpg`;
-      const a = document.createElement("a");
-      a.href = dataUrl;
-      a.download = fname;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      if (isNativeApp()) {
+        await shareJpgInNativeApp(dataUrl, fname);
+      } else {
+        downloadJpgInBrowser(dataUrl, fname);
+      }
     } catch {
       alert("Gagal export JPG. Coba lagi.");
     } finally {
@@ -281,7 +322,7 @@ const ShareScreen = ({txs, allTxs = [], goals = [], period = null, setSubPage}) 
                 </div>
               </div>
             </div>
-            <div style={{display:"flex", gap:8}}>
+            <div style={{display:"flex", gap:8, paddingBottom:safeActionPad}}>
               <button onClick={copyText} style={{flex:1, padding:"14px", borderRadius:12, border:`1.5px solid ${copied?C.pri:C.border}`, background:copied?C.priL:"#fff", color:copied?C.priD:C.text, fontSize:13, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:6, transition:"all .2s"}}>
                 {copied ? <><Check size={16}/> Tersalin!</> : <><Copy size={16}/> Salin Teks</>}
               </button>
@@ -486,8 +527,8 @@ const ShareScreen = ({txs, allTxs = [], goals = [], period = null, setSubPage}) 
             </div>
             {/* ═══ END PRINT AREA ═══ */}
 
-            <div className="no-print" style={{padding:"0 14px 14px", display:"flex", flexDirection:"column", gap:8}}>
-              <button onClick={()=>window.print()} style={{width:"100%", padding:"15px", borderRadius:14, border:"none", background:`linear-gradient(135deg, ${C.red}, #b91c1c)`, color:"#fff", fontSize:14, fontWeight:800, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8, boxShadow:"0 8px 24px rgba(220,38,38,0.4)"}}>
+            <div className="no-print" style={{padding:`0 14px ${safeActionPad}`, display:"flex", flexDirection:"column", gap:8}}>
+              <button onClick={printPdf} style={{width:"100%", padding:"15px", borderRadius:14, border:"none", background:`linear-gradient(135deg, ${C.red}, #b91c1c)`, color:"#fff", fontSize:14, fontWeight:800, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8, boxShadow:"0 8px 24px rgba(220,38,38,0.4)"}}>
                 <FileDown size={18}/> Print / Simpan PDF
               </button>
               <button onClick={exportJpg} disabled={exportingJpg} style={{width:"100%", padding:"13px", borderRadius:14, border:`2px solid ${C.pri}`, background: exportingJpg ? C.borderL : "#fff", color: exportingJpg ? C.textM : C.pri, fontSize:13, fontWeight:800, cursor: exportingJpg ? "not-allowed" : "pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8, transition:"all .2s", opacity: exportingJpg ? 0.7 : 1}}>

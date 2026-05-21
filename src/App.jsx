@@ -156,7 +156,7 @@ export default function App() {
     if(subPage==="zakat") return <ZakatScreen setSubPage={setSubPage}/>;
     if(subPage==="tx-list") return <TxListScreen txs={periodTxs} allTxs={txs} goals={goals} period={period} setPeriod={setPeriod} years={periodYears} onCopyBudget={onCopyBudget} onDeletePeriod={onDeletePeriod} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} onDelete={onDelete} onDone={onDone}/>;
     if(subPage==="share") return <ShareScreen txs={periodTxs} allTxs={txs} goals={goals} period={period} setSubPage={setSubPage}/>;
-    if(tab==="home") return <HomeScreen txs={periodTxs} allTxs={txs} goals={goals} period={period} setPeriod={setPeriod} years={periodYears} onCopyBudget={onCopyBudget} setTab={setTab} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} openUpgrade={openUpgrade} user={user}/>;
+    if(tab==="home") return <HomeScreen txs={periodTxs} allTxs={txs} goals={goals} period={period} setPeriod={setPeriod} years={periodYears} onCopyBudget={onCopyBudget} setTab={setTab} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={setAddOpen} openUpgrade={openUpgrade} isPro={isPro} user={user}/>;
     if(tab==="reports") return <ReportsScreen txs={periodTxs} period={period} setPeriod={setPeriod} years={periodYears} openUpgrade={openUpgrade}/>;
     if(tab==="goals-tab") return <GoalsScreen goals={goals} txs={txs} isPro={isPro} openUpgrade={openUpgrade} onAddSaving={onAddGoalSaving} onAddGoal={onAddGoal} onEditGoal={onEditGoal} onDeleteGoal={onDeleteGoal}/>;
     if(tab==="more") return <MoreScreen setSubPage={setSubPage} openUpgrade={openUpgrade} isPro={isPro} onLogout={()=>setUser(null)} onExportBackup={onExportBackup} onImportBackup={onImportBackup}/>;

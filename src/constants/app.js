@@ -1,11 +1,17 @@
 export const GROUPS = {
-  abang: {label:"Abang", color:"#3b82f6"},
+  abang: {label:"Ayah", color:"#3b82f6"},
   bunda: {label:"Bunda", color:"#ec4899"},
   anak: {label:"Anak", color:"#f59e0b"},
   rumah: {label:"Rumah", color:"#8b5cf6"},
+  dapur_makan: {label:"Dapur / Makan", color:"#f97316"},
+  transportasi: {label:"Transportasi", color:"#0ea5e9"},
+  pendidikan: {label:"Pendidikan", color:"#2563eb"},
+  kesehatan: {label:"Kesehatan", color:"#14b8a6"},
   zakat_sedekah: {label:"Zakat/Sedekah", color:"#10b981"},
   tabungan: {label:"Tabungan", color:"#06b6d4"},
   cicilan: {label:"Cicilan", color:"#ef4444"},
+  darurat: {label:"Darurat", color:"#d97706"},
+  hiburan: {label:"Hiburan", color:"#a855f7"},
   lain_lain: {label:"Lain-lain", color:"#6b7280"},
 };
 

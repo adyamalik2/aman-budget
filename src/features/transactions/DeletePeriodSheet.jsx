@@ -10,6 +10,7 @@ import {
 } from "../../utils/period";
 
 const card = {background:"#fff", borderRadius:16, padding:"14px 16px", border:`1px solid ${C.borderL}`, boxShadow:"0 1px 4px rgba(0,0,0,0.03)"};
+const sheetBodyStyle = {padding:"14px 14px calc(24px + env(safe-area-inset-bottom))", display:"flex", flexDirection:"column", gap:12};
 
 const DeletePeriodSheet = ({txs, initialPeriod, onDelete, onClose}) => {
   const [deletePeriod, setDeletePeriod] = useState(() => normalizePeriod(initialPeriod));
@@ -39,7 +40,7 @@ const DeletePeriodSheet = ({txs, initialPeriod, onDelete, onClose}) => {
           </button>
         </div>
 
-        <div style={{padding:"14px", display:"flex", flexDirection:"column", gap:12}}>
+        <div style={sheetBodyStyle}>
           <div style={card}>
             <PeriodPicker period={deletePeriod} setPeriod={setDeletePeriod} years={years}/>
           </div>

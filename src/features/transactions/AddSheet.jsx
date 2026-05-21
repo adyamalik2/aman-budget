@@ -6,6 +6,7 @@ import { fmt } from "../../utils/format";
 
 const inp = {width:"100%", border:`1.5px solid ${C.border}`, borderRadius:12, padding:"11px 14px", fontSize:14, outline:"none", boxSizing:"border-box", background:"#fff", color:C.text};
 const lbl = {fontSize:12, fontWeight:600, color:C.textM, display:"block", marginBottom:6};
+const sheetBodyStyle = {padding:"14px 14px calc(24px + env(safe-area-inset-bottom))", display:"flex", flexDirection:"column", gap:14};
 
 const AddSheet = ({editTx, goals = [], onSave, onClose}) => {
   const [f, setF] = useState(editTx || {date:new Date().toISOString().slice(0,10), type:"expense", grp:"bunda", cat:"", desc:"", amt:"", status:"estimasi", pay:"transfer", acc:"BSI", goalId:null});
@@ -32,7 +33,7 @@ const AddSheet = ({editTx, goals = [], onSave, onClose}) => {
           </button>
         </div>
 
-        <div style={{padding:"14px", display:"flex", flexDirection:"column", gap:14}}>
+        <div style={sheetBodyStyle}>
           <div>
             <label style={lbl}>Tipe Transaksi</label>
             <div style={{display:"flex", gap:8}}>
@@ -54,7 +55,7 @@ const AddSheet = ({editTx, goals = [], onSave, onClose}) => {
               <div>
                 <label style={lbl}>Grup</label>
                 <select style={inp} value={f.grp} onChange={e=>s("grp", e.target.value)}>
-                  {Object.entries(GROUPS).map(([v,l])=><option key={v} value={v}>{l.label}</option>)}
+                  {Object.entries(GROUPS).map(([v,l])=><option key={v} value={v} style={{color:C.text, background:"#fff"}}>{l.label}</option>)}
                 </select>
               </div>
             )}

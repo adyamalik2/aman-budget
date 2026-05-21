@@ -9,6 +9,7 @@ const card = {background:"#fff", borderRadius:16, padding:"14px 16px", border:`1
 const inp = {width:"100%", border:`1.5px solid ${C.border}`, borderRadius:12, padding:"12px 14px", fontSize:16, outline:"none", boxSizing:"border-box", background:"#fff", color:C.text, fontWeight:700};
 const inpMd = {...inp, fontSize:14, padding:"11px 14px", fontWeight:400};
 const lbl = {fontSize:12, fontWeight:700, color:C.textM, display:"block", marginBottom:6};
+const modalFormStyle = {width:"100%", maxWidth:430, background:"#fff", borderRadius:24, padding:"18px 16px calc(24px + env(safe-area-inset-bottom))", boxShadow:"0 24px 70px rgba(15,23,42,0.28)", boxSizing:"border-box"};
 
 const ICON_MAP = {plane:Plane, grad:GraduationCap, shield:Shield};
 const EMPTY_GFORM = {name:"", target:""};
@@ -192,7 +193,7 @@ const GoalsScreen = ({goals, txs = [], isPro = false, openUpgrade, onAddSaving, 
       {/* ── Modal: Tambah Tabungan ── */}
       {savingGoal && (
         <div style={{position:"fixed", inset:0, background:"rgba(15,23,42,0.5)", zIndex:120, display:"flex", alignItems:"flex-end", justifyContent:"center", padding:"16px 12px"}}>
-          <form onSubmit={saveSaving} style={{width:"100%", maxWidth:430, background:"#fff", borderRadius:24, padding:"18px 16px 16px", boxShadow:"0 24px 70px rgba(15,23,42,0.28)", boxSizing:"border-box"}}>
+          <form onSubmit={saveSaving} style={modalFormStyle}>
             <p style={{fontSize:16, fontWeight:800, color:C.text, margin:"0 0 4px"}}>Tambah Tabungan — {savingGoal.name}</p>
             <p style={{fontSize:12, color:C.textM, margin:"0 0 14px"}}>Masukkan nominal tabungan yang ingin ditambahkan.</p>
 
@@ -221,7 +222,7 @@ const GoalsScreen = ({goals, txs = [], isPro = false, openUpgrade, onAddSaving, 
       {/* ── Modal: Tambah / Edit Goal ── */}
       {goalModal && (
         <div style={{position:"fixed", inset:0, background:"rgba(15,23,42,0.5)", zIndex:120, display:"flex", alignItems:"flex-end", justifyContent:"center", padding:"16px 12px"}}>
-          <form onSubmit={saveGoalModal} style={{width:"100%", maxWidth:430, background:"#fff", borderRadius:24, padding:"18px 16px 16px", boxShadow:"0 24px 70px rgba(15,23,42,0.28)", boxSizing:"border-box"}}>
+          <form onSubmit={saveGoalModal} style={modalFormStyle}>
             <p style={{fontSize:16, fontWeight:800, color:C.text, margin:"0 0 16px"}}>
               {goalModal.mode === "add" ? "Tambah Goal Baru" : `Edit Goal — ${goalModal.goal.name}`}
             </p>
