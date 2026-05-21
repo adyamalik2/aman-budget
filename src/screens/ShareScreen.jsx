@@ -129,6 +129,7 @@ const ShareScreen = ({txs, allTxs = [], goals = [], period = null, setSubPage}) 
   const grps        = calcGroups(txs);
   const unpaid      = txs.filter(x => x.status === "belum_selesai");
   const periodLabel = formatPeriodLabel(period);
+  const nativeApp   = isNativeApp();
 
   const goalsCalc = useMemo(() => goals.map(g => {
     const manualSaved    = Number(g.saved || 0);
@@ -345,7 +346,11 @@ const ShareScreen = ({txs, allTxs = [], goals = [], period = null, setSubPage}) 
               <div style={{background:"#fef2f2", borderRadius:12, padding:"10px 14px", display:"flex", gap:10, alignItems:"flex-start"}}>
                 <FileDown size={15} color={C.red} style={{marginTop:2, flexShrink:0}}/>
                 <p style={{margin:0, fontSize:11, color:"#991b1b", lineHeight:1.5}}>
-                  Tekan <b>Print / Simpan PDF</b> → pilih <b>"Save as PDF"</b> di dialog cetak.
+                  {nativeApp ? (
+                    <>PDF hanya tersedia di browser. Untuk APK Android gunakan <b>Export JPG</b>.</>
+                  ) : (
+                    <>Tekan <b>Print / Simpan PDF</b> → pilih <b>"Save as PDF"</b> di dialog cetak.</>
+                  )}
                 </p>
               </div>
             </div>
@@ -528,9 +533,11 @@ const ShareScreen = ({txs, allTxs = [], goals = [], period = null, setSubPage}) 
             {/* ═══ END PRINT AREA ═══ */}
 
             <div className="no-print" style={{padding:`0 14px ${safeActionPad}`, display:"flex", flexDirection:"column", gap:8}}>
-              <button onClick={printPdf} style={{width:"100%", padding:"15px", borderRadius:14, border:"none", background:`linear-gradient(135deg, ${C.red}, #b91c1c)`, color:"#fff", fontSize:14, fontWeight:800, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8, boxShadow:"0 8px 24px rgba(220,38,38,0.4)"}}>
-                <FileDown size={18}/> Print / Simpan PDF
-              </button>
+              {!nativeApp && (
+                <button onClick={printPdf} style={{width:"100%", padding:"15px", borderRadius:14, border:"none", background:`linear-gradient(135deg, ${C.red}, #b91c1c)`, color:"#fff", fontSize:14, fontWeight:800, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8, boxShadow:"0 8px 24px rgba(220,38,38,0.4)"}}>
+                  <FileDown size={18}/> Print / Simpan PDF
+                </button>
+              )}
               <button onClick={exportJpg} disabled={exportingJpg} style={{width:"100%", padding:"13px", borderRadius:14, border:`2px solid ${C.pri}`, background: exportingJpg ? C.borderL : "#fff", color: exportingJpg ? C.textM : C.pri, fontSize:13, fontWeight:800, cursor: exportingJpg ? "not-allowed" : "pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8, transition:"all .2s", opacity: exportingJpg ? 0.7 : 1}}>
                 <ImageDown size={16}/> {exportingJpg ? "Mengekspor..." : "Export JPG"}
               </button>

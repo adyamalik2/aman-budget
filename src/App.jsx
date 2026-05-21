@@ -1,4 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
+import { App as CapacitorApp } from "@capacitor/app";
+import { Capacitor } from "@capacitor/core";
 import BottomNav from "./components/layout/BottomNav";
 import HomeScreen from "./screens/HomeScreen";
 import GoalsScreen from "./screens/GoalsScreen";
@@ -147,6 +149,38 @@ export default function App() {
   const openUpgrade = () => setSubPage("upgrade");
   const onActivatePro   = () => { setIsPro(true);  alert("Mode Pro sementara aktif untuk testing."); };
   const onDeactivatePro = () => setIsPro(false);
+
+  useEffect(() => {
+    if (Capacitor.getPlatform() !== "android") return undefined;
+
+    let removeListener;
+    const setupBackButton = async () => {
+      const listener = await CapacitorApp.addListener("backButton", () => {
+        if(addOpen) {
+          setAddOpen(false);
+          setEditTx(null);
+          return;
+        }
+        if(subPage) {
+          setSubPage(null);
+          return;
+        }
+        if(tab !== "home") {
+          setTab("home");
+          return;
+        }
+        if(window.confirm("Keluar dari AMAN Budget?")) {
+          CapacitorApp.exitApp();
+        }
+      });
+      removeListener = () => listener.remove();
+    };
+
+    setupBackButton();
+    return () => {
+      removeListener?.();
+    };
+  }, [addOpen, subPage, tab]);
 
   if(!user) return <LoginScreen onLogin={setUser}/>;
 
