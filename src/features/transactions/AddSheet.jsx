@@ -8,10 +8,11 @@ const inp = {width:"100%", border:`1.5px solid ${C.border}`, borderRadius:12, pa
 const lbl = {fontSize:12, fontWeight:600, color:C.textM, display:"block", marginBottom:6};
 const sheetBodyStyle = {padding:"14px 14px calc(24px + env(safe-area-inset-bottom))", display:"flex", flexDirection:"column", gap:14};
 
-const AddSheet = ({editTx, goals = [], accounts = DEFAULT_ACCOUNTS, categoryGroups = DEFAULT_CATEGORY_GROUPS, onSave, onClose}) => {
+const AddSheet = ({editTx, goals = [], accounts = DEFAULT_ACCOUNTS, categoryGroups = DEFAULT_CATEGORY_GROUPS, lastTxDate = "", onSave, onClose}) => {
   const initialAccount = accounts.find(account=>account?.active !== false && account?.name)?.name || "";
   const initialGroup = categoryGroups.find(group=>group?.active !== false && group?.id)?.id || "";
-  const [f, setF] = useState(editTx || {date:new Date().toISOString().slice(0,10), type:"expense", grp:initialGroup, cat:"", desc:"", amt:"", status:"estimasi", pay:"transfer", acc:initialAccount, goalId:null});
+  const initialDate = lastTxDate || new Date().toISOString().slice(0,10);
+  const [f, setF] = useState(editTx || {date:initialDate, type:"expense", grp:initialGroup, cat:"", desc:"", amt:"", status:"estimasi", pay:"transfer", acc:initialAccount, goalId:null});
   const [err, setErr] = useState({});
   const [showCatSuggestions, setShowCatSuggestions] = useState(false);
   const s = (k,v) => setF(p=>({...p, [k]:v}));
@@ -37,7 +38,7 @@ const AddSheet = ({editTx, goals = [], accounts = DEFAULT_ACCOUNTS, categoryGrou
     if(!f.desc?.trim()) e.desc = "Wajib diisi";
     if(!f.amt || Number(f.amt)<=0) e.amt = "Nominal harus > 0";
     if(Object.keys(e).length) {setErr(e); return;}
-    onSave({...f, amt:Number(f.amt), id:f.id||Date.now().toString(), goalId:f.goalId||null});
+    onSave({...f, amt:Number(f.amt), id:f.id||Date.now().toString(), goalId:f.goalId||null}, {isNew:!editTx});
     onClose();
   };
 

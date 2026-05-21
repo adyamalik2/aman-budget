@@ -52,6 +52,7 @@ export default function App() {
   const [goals, setGoals] = useState(() => loadStored(STORAGE_KEYS.goals, INIT_GOALS, Array.isArray));
   const [accounts, setAccounts] = useState(() => loadStored(STORAGE_KEYS.accounts, DEFAULT_ACCOUNTS, Array.isArray));
   const [categoryGroups, setCategoryGroups] = useState(() => loadStored(STORAGE_KEYS.categoryGroups, DEFAULT_CATEGORY_GROUPS, Array.isArray));
+  const [lastTxDate, setLastTxDate] = useState(() => loadStored(STORAGE_KEYS.lastTxDate, "", v=>typeof v==="string"));
   const [period, setPeriod] = useState(() => normalizePeriod(loadStored(STORAGE_KEYS.period, getDefaultPeriod(), v=>v&&typeof v==="object"&&!Array.isArray(v))));
   const [isPro, setIsPro] = useState(() => loadStored(STORAGE_KEYS.isPro, false, v=>v===true||v===false));
   const [cloudUser, setCloudUser] = useState(null);
@@ -64,6 +65,7 @@ export default function App() {
   useEffect(()=>{ saveStored(STORAGE_KEYS.goals, goals); }, [goals]);
   useEffect(()=>{ saveStored(STORAGE_KEYS.accounts, accounts); }, [accounts]);
   useEffect(()=>{ saveStored(STORAGE_KEYS.categoryGroups, categoryGroups); }, [categoryGroups]);
+  useEffect(()=>{ saveStored(STORAGE_KEYS.lastTxDate, lastTxDate); }, [lastTxDate]);
   useEffect(()=>{ saveStored(STORAGE_KEYS.period, normalizePeriod(period)); }, [period]);
   useEffect(()=>{ saveStored(STORAGE_KEYS.isPro, isPro); }, [isPro]);
   useEffect(()=>{ saveStored(SKIP_LOGIN_KEY, hasSkippedLogin); }, [hasSkippedLogin]);
@@ -106,12 +108,15 @@ export default function App() {
     setPeriod(nextPeriod);
   };
 
-  const onSave = tx => setTxs(p=>{
+  const onSave = (tx, meta = {}) => {
     setHasUnsyncedChanges(true);
-    const i = p.findIndex(x=>x.id===tx.id);
-    if(i>=0) {const n=[...p]; n[i]=tx; return n;}
-    return [...p, tx];
-  });
+    if(meta.isNew && tx.date) setLastTxDate(tx.date);
+    setTxs(p=>{
+      const i = p.findIndex(x=>x.id===tx.id);
+      if(i>=0) {const n=[...p]; n[i]=tx; return n;}
+      return [...p, tx];
+    });
+  };
   const onDelete = id => {
     const deletedAt = new Date().toISOString();
     setHasUnsyncedChanges(true);
@@ -485,7 +490,7 @@ export default function App() {
       <div style={{width:"100%", maxWidth:430, display:"flex", flexDirection:"column", minHeight:"100vh", position:"relative", background:C.bg}}>
         {renderScreen()}
         {!hideNav && <BottomNav tab={tab} setTab={(t)=>{setTab(t); setSubPage(null);}} setAddOpen={setAddOpen} setEditTx={setEditTx}/>}
-        {addOpen && <AddSheet editTx={editTx} goals={goals} accounts={accounts} categoryGroups={categoryGroups} onSave={onSave} onClose={()=>{setAddOpen(false); setEditTx(null);}}/>}
+        {addOpen && <AddSheet editTx={editTx} goals={goals} accounts={accounts} categoryGroups={categoryGroups} lastTxDate={lastTxDate} onSave={onSave} onClose={()=>{setAddOpen(false); setEditTx(null);}}/>}
       </div>
     </div>
   );

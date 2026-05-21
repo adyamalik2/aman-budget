@@ -5,11 +5,12 @@ import { Directory, Filesystem } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
 import { toJpeg } from "html-to-image";
 import Header from "../components/layout/Header";
+import PeriodPicker from "../components/period/PeriodPicker";
 import { GROUPS, STATUS } from "../constants/app";
 import { C } from "../constants/theme";
 import { fmt, fmtS } from "../utils/format";
 import { calcGoalTransactionSaved } from "../utils/goals";
-import { formatPeriodLabel, formatShortDate } from "../utils/period";
+import { formatPeriodLabel, formatShortDate, getPeriodYears, isTxInPeriod, normalizePeriod } from "../utils/period";
 import { calcGroups, calcSummary } from "../utils/summary";
 
 const resolveTxGrp = tx => (tx.grp && GROUPS[tx.grp]) ? tx.grp : "lain_lain";
@@ -118,28 +119,45 @@ const GrpTable = ({grpKey, txList, goals}) => {
   );
 };
 
-const ShareScreen = ({txs, allTxs = [], goals = [], period = null, categoryGroups = [], setSubPage}) => {
+const ShareScreen = ({allTxs = [], goals = [], period = null, categoryGroups = [], setSubPage}) => {
   const [format, setFormat]       = useState("whatsapp");
   const [copied, setCopied]       = useState(false);
-  const [filterGrp, setFilterGrp] = useState("all");
+  const [selectedPeriod, setSelectedPeriod] = useState(() => normalizePeriod(period));
+  const [selectedGroups, setSelectedGroups] = useState([]);
   const [exportingJpg, setExportingJpg] = useState(false);
   const reportRef = useRef(null);
   const resetCopyTimeoutRef = useRef(null);
 
-  const s           = calcSummary(txs);
-  const grps        = calcGroups(txs);
-  const unpaid      = txs.filter(x => x.status === "belum_selesai");
-  const periodLabel = formatPeriodLabel(period);
+  const periodYears = useMemo(()=>getPeriodYears(allTxs, selectedPeriod), [allTxs, selectedPeriod]);
+  const periodTxs = useMemo(()=>allTxs.filter(tx=>isTxInPeriod(tx, selectedPeriod)), [allTxs, selectedPeriod]);
+  const reportTxs = useMemo(()=>(
+    selectedGroups.length === 0
+      ? periodTxs
+      : periodTxs.filter(tx=>tx.type === "expense" && selectedGroups.includes(resolveTxGrp(tx)))
+  ), [periodTxs, selectedGroups]);
+  const s           = calcSummary(reportTxs);
+  const grps        = calcGroups(reportTxs);
+  const unpaid      = reportTxs.filter(x => x.status === "belum_selesai");
+  const periodLabel = formatPeriodLabel(selectedPeriod);
   const nativeApp   = isNativeApp();
+  const filterGroups = categoryGroups
+    .filter(group=>group?.active !== false && GROUPS[group.id])
+    .map(group=>({key:group.id, label:group.label || GROUPS[group.id]?.label || group.id}));
+  const selectedGroupLabel = selectedGroups.length === 0
+    ? "Semua Grup"
+    : selectedGroups.map(key=>filterGroups.find(group=>group.key === key)?.label || GROUPS[key]?.label || key).join(" + ");
+  const toggleGroup = key => {
+    setSelectedGroups(prev=>prev.includes(key) ? prev.filter(item=>item !== key) : [...prev, key]);
+  };
 
   const goalsCalc = useMemo(() => goals.map(g => {
     const manualSaved    = Number(g.saved || 0);
-    const txSaved        = calcGoalTransactionSaved(allTxs, g);
+    const txSaved        = calcGoalTransactionSaved(reportTxs, g);
     const displayedSaved = manualSaved + txSaved;
     const target         = Number(g.target || 0);
     const pct            = target > 0 ? Math.min(Math.round(displayedSaved / target * 100), 100) : 0;
     return {...g, manualSaved, txSaved, displayedSaved, pct};
-  }), [goals, allTxs]);
+  }), [goals, reportTxs]);
 
   const totalGoalTarget = goalsCalc.reduce((sum, g) => sum + Number(g.target || 0), 0);
   const totalGoalSaved  = goalsCalc.reduce((sum, g) => sum + g.displayedSaved, 0);
@@ -161,26 +179,23 @@ const ShareScreen = ({txs, allTxs = [], goals = [], period = null, categoryGroup
   };
 
   const incomeTxs = useMemo(() =>
-    txs.filter(tx => tx.type === "income").sort((a, b) => b.date.localeCompare(a.date)),
-  [txs]);
+    reportTxs.filter(tx => tx.type === "income").sort((a, b) => b.date.localeCompare(a.date)),
+  [reportTxs]);
 
   const groupedExpenses = useMemo(() => {
     const map = {};
     Object.keys(GROUPS).forEach(k => { map[k] = []; });
-    txs.filter(tx => tx.type === "expense").forEach(tx => {
+    reportTxs.filter(tx => tx.type === "expense").forEach(tx => {
       map[resolveTxGrp(tx)].push(tx);
     });
     Object.keys(map).forEach(k => map[k].sort((a, b) => b.date.localeCompare(a.date)));
     return map;
-  }, [txs]);
+  }, [reportTxs]);
 
   const activeGroups  = Object.keys(GROUPS).filter(k => groupedExpenses[k]?.length > 0);
-  const filterGroups = categoryGroups
-    .filter(group=>group?.active !== false && GROUPS[group.id])
-    .map(group=>({key:group.id, label:group.label || GROUPS[group.id]?.label || group.id}));
-  const visibleGroups = filterGrp === "all"
+  const visibleGroups = selectedGroups.length === 0
     ? activeGroups
-    : (groupedExpenses[filterGrp]?.length > 0 ? [filterGrp] : []);
+    : selectedGroups.filter(key=>groupedExpenses[key]?.length > 0);
 
   const kpis = [
     {label:"Total Pemasukan",  value:fmt(s.totalIncome), color:C.pri,                                border:`2px solid ${C.pri}`},
@@ -194,6 +209,7 @@ const ShareScreen = ({txs, allTxs = [], goals = [], period = null, categoryGroup
   // ── WhatsApp text ──
   let waText = "📊 *LAPORAN KEUANGAN KELUARGA*\n";
   waText += `_${periodLabel}_\n`;
+  if (selectedGroups.length > 0) waText += `_Grup: ${selectedGroupLabel}_\n`;
   waText += "━━━━━━━━━━━━━━━━━━━━\n\n";
   waText += "💰 *RINGKASAN*\n";
   waText += "```\n";
@@ -332,6 +348,29 @@ const ShareScreen = ({txs, allTxs = [], goals = [], period = null, categoryGroup
         </div>
 
         {/* ─── WhatsApp Tab ─── */}
+        <div className="no-print" style={{padding:"12px 14px 0", display:"flex", flexDirection:"column", gap:10}}>
+          <div style={{background:"#fff", borderRadius:14, padding:"12px", border:`1px solid ${C.borderL}`, boxShadow:"0 1px 4px rgba(0,0,0,0.03)"}}>
+            <p style={{fontSize:11, fontWeight:800, color:C.textM, margin:"0 0 8px"}}>Periode Laporan</p>
+            <PeriodPicker period={selectedPeriod} setPeriod={setSelectedPeriod} years={periodYears}/>
+          </div>
+          <div style={{background:"#fff", borderRadius:14, padding:"12px", border:`1px solid ${C.borderL}`, boxShadow:"0 1px 4px rgba(0,0,0,0.03)"}}>
+            <p style={{fontSize:11, fontWeight:800, color:C.textM, margin:"0 0 8px"}}>Filter Grup</p>
+            <div style={{display:"flex", gap:6, overflowX:"auto", paddingBottom:2, scrollbarWidth:"none"}}>
+              <button type="button" onClick={()=>setSelectedGroups([])} style={{padding:"7px 13px", borderRadius:20, border:"none", cursor:"pointer", whiteSpace:"nowrap", fontSize:11, fontWeight:800, flexShrink:0, background:selectedGroups.length===0?C.pri:C.borderL, color:selectedGroups.length===0?"#fff":C.textM}}>
+                Semua Grup
+              </button>
+              {filterGroups.map(opt => {
+                const active = selectedGroups.includes(opt.key);
+                return (
+                  <button key={opt.key} type="button" onClick={()=>toggleGroup(opt.key)} style={{padding:"7px 13px", borderRadius:20, border:"none", cursor:"pointer", whiteSpace:"nowrap", fontSize:11, fontWeight:800, flexShrink:0, background:active?C.pri:C.borderL, color:active?"#fff":C.textM}}>
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
         {format === "whatsapp" ? (
           <div className="no-print" style={{padding:"12px 14px 14px", display:"flex", flexDirection:"column", gap:12}}>
             <div style={{background:"#e5ddd5", borderRadius:14, padding:"14px 12px", boxShadow:"inset 0 2px 8px rgba(0,0,0,0.05)"}}>
@@ -375,24 +414,6 @@ const ShareScreen = ({txs, allTxs = [], goals = [], period = null, categoryGroup
               </div>
             </div>
 
-            {/* Group filter */}
-            <div className="no-print" style={{padding:"10px 14px 0"}}>
-              <p style={{fontSize:11, fontWeight:700, color:C.textM, margin:"0 0 7px"}}>Filter Grup:</p>
-              <div style={{display:"flex", gap:6, overflowX:"auto", paddingBottom:4, scrollbarWidth:"none"}}>
-                {[{key:"all", label:"Semua Grup"}, ...filterGroups].map(opt => (
-                  <button key={opt.key} onClick={()=>setFilterGrp(opt.key)} style={{
-                    padding:"6px 13px", borderRadius:20, border:"none", cursor:"pointer", whiteSpace:"nowrap",
-                    fontSize:11, fontWeight:700, flexShrink:0,
-                    background: filterGrp === opt.key ? C.pri : C.borderL,
-                    color:      filterGrp === opt.key ? "#fff" : C.textM,
-                    transition:"all .15s",
-                  }}>
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {/* ═══ PRINT AREA ═══ */}
             <div ref={reportRef} className="print-area" style={{margin:"12px", background:"#fff", borderRadius:14, padding:"14px 12px 10px", border:`1px solid ${C.borderL}`, boxShadow:"0 4px 20px rgba(0,0,0,0.06)"}}>
 
@@ -404,9 +425,9 @@ const ShareScreen = ({txs, allTxs = [], goals = [], period = null, categoryGroup
                 <h2 style={{margin:0, fontSize:13, color:C.text, fontWeight:800, letterSpacing:-0.3}}>AMAN BUDGET</h2>
                 <p style={{margin:"1px 0 0", fontSize:10, color:C.pri, fontWeight:700}}>Laporan Keuangan Keluarga</p>
                 <p style={{margin:"1px 0 0", fontSize:9, color:C.textM}}>Periode: {periodLabel}</p>
-                {filterGrp !== "all" && (
+                {selectedGroups.length > 0 && (
                   <span style={{display:"inline-block", marginTop:3, background:C.priL, color:C.priD, fontSize:8, fontWeight:700, padding:"2px 7px", borderRadius:7}}>
-                    Filter: {GROUPS[filterGrp]?.label}
+                    Filter: {selectedGroupLabel}
                   </span>
                 )}
               </div>
@@ -425,7 +446,7 @@ const ShareScreen = ({txs, allTxs = [], goals = [], period = null, categoryGroup
               </div>
 
               {/* Rekapitulasi */}
-              {filterGrp === "all" && (
+              {selectedGroups.length === 0 && (
                 <div className="rpt-sec-sm" style={{marginBottom:5}}>
                   <span className="rpt-hd" style={secHead(C.pri)}>REKAPITULASI</span>
                   <table className="rpt-table" style={{width:"100%", fontSize:7, borderCollapse:"collapse", border:`1px solid ${C.borderL}`, borderTop:"none"}}>
@@ -451,7 +472,7 @@ const ShareScreen = ({txs, allTxs = [], goals = [], period = null, categoryGroup
               )}
 
               {/* Pemasukan section */}
-              {filterGrp === "all" && incomeTxs.length > 0 && (
+              {selectedGroups.length === 0 && incomeTxs.length > 0 && (
                 <div className="rpt-sec" style={{marginBottom:5}}>
                   <span className="rpt-hd" style={secHead(C.pri)}>PEMASUKAN ({incomeTxs.length})</span>
                   <table className="rpt-table" style={{width:"100%", fontSize:7, borderCollapse:"collapse", border:`1px solid ${C.borderL}`, borderTop:"none"}}>
@@ -497,7 +518,7 @@ const ShareScreen = ({txs, allTxs = [], goals = [], period = null, categoryGroup
                 <GrpTable key={grpKey} grpKey={grpKey} txList={groupedExpenses[grpKey]} goals={goals}/>
               ))}
 
-              {visibleGroups.length === 0 && filterGrp !== "all" && (
+              {visibleGroups.length === 0 && selectedGroups.length > 0 && (
                 <div style={{textAlign:"center", padding:"20px 0", color:C.textL}}>
                   <p style={{fontSize:11, margin:0}}>Tidak ada transaksi untuk grup ini.</p>
                 </div>
