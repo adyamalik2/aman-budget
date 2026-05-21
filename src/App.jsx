@@ -161,6 +161,10 @@ export default function App() {
     }
   };
   const onCloudLogin = async () => {
+    if(Capacitor.isNativePlatform()) {
+      alert("Fitur Backup Cloud (Login Google) saat ini baru tersedia di versi Web/Browser. Versi Aplikasi akan menyusul di pembaruan berikutnya.");
+      return;
+    }
     if(!isFirebaseConfigured || !auth || !googleProvider) {
       alert("Firebase belum terkonfigurasi. Restart dev server atau cek .env.local.");
       return;
