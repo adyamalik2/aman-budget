@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Copy, FileDown, ImageDown, Send, Shield, Sparkles } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import { Directory, Filesystem } from "@capacitor/filesystem";
@@ -124,6 +124,7 @@ const ShareScreen = ({txs, allTxs = [], goals = [], period = null, setSubPage}) 
   const [filterGrp, setFilterGrp] = useState("all");
   const [exportingJpg, setExportingJpg] = useState(false);
   const reportRef = useRef(null);
+  const resetCopyTimeoutRef = useRef(null);
 
   const s           = calcSummary(txs);
   const grps        = calcGroups(txs);
@@ -142,6 +143,22 @@ const ShareScreen = ({txs, allTxs = [], goals = [], period = null, setSubPage}) 
 
   const totalGoalTarget = goalsCalc.reduce((sum, g) => sum + Number(g.target || 0), 0);
   const totalGoalSaved  = goalsCalc.reduce((sum, g) => sum + g.displayedSaved, 0);
+
+  useEffect(() => () => {
+    if (resetCopyTimeoutRef.current) {
+      clearTimeout(resetCopyTimeoutRef.current);
+    }
+  }, []);
+
+  const scheduleCopyReset = () => {
+    if (resetCopyTimeoutRef.current) {
+      clearTimeout(resetCopyTimeoutRef.current);
+    }
+    resetCopyTimeoutRef.current = setTimeout(() => {
+      setCopied(false);
+      resetCopyTimeoutRef.current = null;
+    }, 2000);
+  };
 
   const incomeTxs = useMemo(() =>
     txs.filter(tx => tx.type === "income").sort((a, b) => b.date.localeCompare(a.date)),
@@ -210,7 +227,7 @@ const ShareScreen = ({txs, allTxs = [], goals = [], period = null, setSubPage}) 
     try {
       await navigator.clipboard.writeText(waText);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      scheduleCopyReset();
     } catch {
       const ta = document.createElement("textarea");
       ta.value = waText;
@@ -221,7 +238,7 @@ const ShareScreen = ({txs, allTxs = [], goals = [], period = null, setSubPage}) 
       try { document.execCommand("copy"); } catch { /* ignore */ }
       document.body.removeChild(ta);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      scheduleCopyReset();
     }
   };
 

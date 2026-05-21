@@ -31,6 +31,11 @@ const MoreScreen = ({
   onPermanentDeleteTx,
 }) => {
   const [trashOpen, setTrashOpen] = useState(false);
+  const cloudEmail = cloudUser?.email || "";
+  const cloudNameFallback = cloudEmail ? cloudEmail.split("@")[0] : "Pengguna";
+  const profileName = cloudUser ? (cloudUser.displayName || cloudNameFallback) : "Malik (Lokal)";
+  const profileSubtitle = cloudUser ? (cloudEmail || "Email tidak tersedia") : "Mode Lokal - Data di HP";
+  const profileInitial = profileName.trim().charAt(0).toUpperCase() || "P";
   const items = [
     {icon:ArrowRightLeft, label:"Transfer Planner", desc:"Alokasi per anggota keluarga", action:()=>setSubPage("transfer"), color:C.blue},
     {icon:Calculator, label:"Kalkulator Zakat", desc:"Hitung zakat penghasilan 2.5%", action:()=>setSubPage("zakat"), color:C.pri},
@@ -76,10 +81,10 @@ const MoreScreen = ({
         {/* Profile card */}
         <div style={card}>
           <div style={{display:"flex", alignItems:"center", gap:12}}>
-            <div style={{width:54, height:54, background:`linear-gradient(135deg, ${C.pri}, ${C.priD})`, borderRadius:16, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:22, fontWeight:800}}>M</div>
+            <div style={{width:54, height:54, background:`linear-gradient(135deg, ${C.pri}, ${C.priD})`, borderRadius:16, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:22, fontWeight:800}}>{profileInitial}</div>
             <div style={{flex:1}}>
-              <p style={{fontSize:15, fontWeight:700, color:C.text, margin:0}}>Malik</p>
-              <p style={{fontSize:11, color:C.textM, margin:"2px 0"}}>malik@amandigital.web.id</p>
+              <p style={{fontSize:15, fontWeight:700, color:C.text, margin:0}}>{profileName}</p>
+              <p style={{fontSize:11, color:C.textM, margin:"2px 0"}}>{profileSubtitle}</p>
               <Badge bg={C.borderL} color={C.textM}>FREE PLAN</Badge>
             </div>
             <button style={{background:"none", border:"none", cursor:"pointer", color:C.textM, padding:0}}>

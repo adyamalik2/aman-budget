@@ -103,7 +103,8 @@ export const deleteTransactionsByPeriod = (txs, period) => {
   const p = normalizePeriod(period);
   const deleted = p.mode==="range" ? getTransactionsByRange(txs, p) : getTransactionsByPeriod(txs, p.month, p.year);
   const ids = new Set(deleted.map(tx=>tx.id));
-  return {deleted, next:txs.filter(tx=>!ids.has(tx.id))};
+  const deletedAt = new Date().toISOString();
+  return {deleted, next:txs.map(tx=>ids.has(tx.id) ? {...tx, deletedAt:tx.deletedAt || deletedAt} : tx)};
 };
 
 export const formatShortDate = date => {
