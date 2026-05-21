@@ -53,6 +53,7 @@ export default function App() {
   const [accounts, setAccounts] = useState(() => loadStored(STORAGE_KEYS.accounts, DEFAULT_ACCOUNTS, Array.isArray));
   const [categoryGroups, setCategoryGroups] = useState(() => loadStored(STORAGE_KEYS.categoryGroups, DEFAULT_CATEGORY_GROUPS, Array.isArray));
   const [lastTxDate, setLastTxDate] = useState(() => loadStored(STORAGE_KEYS.lastTxDate, "", v=>typeof v==="string"));
+  const [transfers, setTransfers] = useState(() => loadStored(STORAGE_KEYS.transfers, [], Array.isArray));
   const [period, setPeriod] = useState(() => normalizePeriod(loadStored(STORAGE_KEYS.period, getDefaultPeriod(), v=>v&&typeof v==="object"&&!Array.isArray(v))));
   const [isPro, setIsPro] = useState(() => loadStored(STORAGE_KEYS.isPro, false, v=>v===true||v===false));
   const [cloudUser, setCloudUser] = useState(null);
@@ -66,6 +67,7 @@ export default function App() {
   useEffect(()=>{ saveStored(STORAGE_KEYS.accounts, accounts); }, [accounts]);
   useEffect(()=>{ saveStored(STORAGE_KEYS.categoryGroups, categoryGroups); }, [categoryGroups]);
   useEffect(()=>{ saveStored(STORAGE_KEYS.lastTxDate, lastTxDate); }, [lastTxDate]);
+  useEffect(()=>{ saveStored(STORAGE_KEYS.transfers, transfers); }, [transfers]);
   useEffect(()=>{ saveStored(STORAGE_KEYS.period, normalizePeriod(period)); }, [period]);
   useEffect(()=>{ saveStored(STORAGE_KEYS.isPro, isPro); }, [isPro]);
   useEffect(()=>{ saveStored(SKIP_LOGIN_KEY, hasSkippedLogin); }, [hasSkippedLogin]);
@@ -96,9 +98,10 @@ export default function App() {
     goals,
     accounts,
     categoryGroups,
+    transfers,
     periodSetting: normalizePeriod(period),
     user: appUser,
-  }), [txs, goals, accounts, categoryGroups, period, appUser]);
+  }), [txs, goals, accounts, categoryGroups, transfers, period, appUser]);
   const onContinueLocal = () => {
     setHasSkippedLogin(true);
     setUser(LOCAL_MODE_USER);
@@ -176,6 +179,18 @@ export default function App() {
   const onCategoryGroupsChange = nextCategoryGroups => {
     setHasUnsyncedChanges(true);
     setCategoryGroups(nextCategoryGroups);
+  };
+  const onSaveTransfer = transfer => {
+    setHasUnsyncedChanges(true);
+    setTransfers(prev=>{
+      const i = prev.findIndex(item=>item.id === transfer.id);
+      if(i >= 0) {const next = [...prev]; next[i] = transfer; return next;}
+      return [...prev, transfer];
+    });
+  };
+  const onDeleteTransfer = id => {
+    setHasUnsyncedChanges(true);
+    setTransfers(prev=>prev.filter(item=>item.id !== id));
   };
   const getPeriodDate = activePeriod => {
     const p = normalizePeriod(activePeriod);
@@ -261,6 +276,7 @@ export default function App() {
         goals,
         accounts,
         categoryGroups,
+        transfers,
         user,
         periodSetting:normalizePeriod(period),
         period:normalizePeriod(period),
@@ -299,6 +315,7 @@ export default function App() {
       if(data.goals !== undefined) setGoals(data.goals);
       setAccounts(Array.isArray(data.accounts) ? data.accounts : DEFAULT_ACCOUNTS);
       setCategoryGroups(Array.isArray(data.categoryGroups) ? data.categoryGroups : DEFAULT_CATEGORY_GROUPS);
+      setTransfers(Array.isArray(data.transfers) ? data.transfers : []);
       if(Object.prototype.hasOwnProperty.call(data, "user")) setUser(data.user);
       if(data.periodSetting !== undefined) setPeriod(normalizePeriod(data.periodSetting));
       else if(data.period !== undefined) setPeriod(normalizePeriod(data.period));
@@ -406,6 +423,7 @@ export default function App() {
       if(Array.isArray(data.goals)) setGoals(data.goals);
       setAccounts(Array.isArray(data.accounts) ? data.accounts : DEFAULT_ACCOUNTS);
       setCategoryGroups(Array.isArray(data.categoryGroups) ? data.categoryGroups : DEFAULT_CATEGORY_GROUPS);
+      setTransfers(Array.isArray(data.transfers) ? data.transfers : []);
       if(data.periodSetting !== undefined) setPeriod(normalizePeriod(data.periodSetting));
       else if(data.period !== undefined) setPeriod(normalizePeriod(data.period));
       if(data.user && typeof data.user === "object") setUser(data.user);
@@ -463,7 +481,7 @@ export default function App() {
 
   const renderScreen = () => {
     if(subPage==="upgrade") return <UpgradeScreen setSubPage={setSubPage} isPro={isPro} onActivatePro={onActivatePro} onDeactivatePro={onDeactivatePro}/>;
-    if(subPage==="transfer") return <TransferScreen txs={activeTxs} setSubPage={setSubPage}/>;
+    if(subPage==="transfer") return <TransferScreen accounts={accounts} transfers={transfers} onSaveTransfer={onSaveTransfer} onDeleteTransfer={onDeleteTransfer} setSubPage={setSubPage}/>;
     if(subPage==="zakat") return <ZakatScreen setSubPage={setSubPage} onAddZakatBudget={onAddZakatBudget}/>;
     if(subPage==="accounts") return <AccountsScreen accounts={accounts} txs={txs} onAccountsChange={onAccountsChange} setSubPage={setSubPage}/>;
     if(subPage==="category-groups") return <CategoryGroupsScreen categoryGroups={categoryGroups} txs={txs} onCategoryGroupsChange={onCategoryGroupsChange} setSubPage={setSubPage}/>;

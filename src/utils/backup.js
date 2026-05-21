@@ -21,6 +21,7 @@ export const isValidBackupData = data => {
   if(!isRecord(data)||!Array.isArray(data.transactions)) return false;
   if(!data.transactions.every(isValidBackupTx)) return false;
   if(data.goals !== undefined && (!Array.isArray(data.goals)||!data.goals.every(isRecord))) return false;
+  if(data.transfers !== undefined && (!Array.isArray(data.transfers)||!data.transfers.every(isRecord))) return false;
   if(data.user !== undefined && data.user !== null && !isRecord(data.user)) return false;
   if(data.period !== undefined && !isRecord(data.period)) return false;
   if(data.periodSetting !== undefined && !isRecord(data.periodSetting)) return false;

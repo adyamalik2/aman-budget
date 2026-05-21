@@ -71,4 +71,5 @@ export const STORAGE_KEYS = {
   accounts: "amanBudget.accounts",
   categoryGroups: "amanBudget.categoryGroups",
   lastTxDate: "amanBudget.lastTransactionDate",
+  transfers: "amanBudget.transfers",
 };
