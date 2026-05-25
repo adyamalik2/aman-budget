@@ -12,7 +12,7 @@ const lbl = {fontSize:12, fontWeight:600, color:C.textM, display:"block", margin
 const ZAKAT_INCOME_KEY = "amanBudget.zakatIncome";
 
 const ZakatScreen = ({setSubPage, onAddZakatBudget}) => {
-  const [income, setIncome] = useState(() => loadStored(ZAKAT_INCOME_KEY, "18500000", value=>typeof value === "string" || typeof value === "number"));
+  const [income, setIncome] = useState(() => loadStored(ZAKAT_INCOME_KEY, "", value=>typeof value === "string" || typeof value === "number"));
   const num = Number(income) || 0;
   const zakat = num * 0.025;
   const nisab = 7500000; // approx
