@@ -9,17 +9,30 @@ import { C } from "../constants/theme";
 import { fmtS } from "../utils/format";
 import { formatPeriodLabel, formatShortDate } from "../utils/period";
 
-const TxListScreen = ({txs, allTxs, goals = [], period, setPeriod, years, onCopyBudget, onDeletePeriod, setSubPage, setEditTx, setAddOpen, onDelete, onDone, onCopy}) => {
+const TxListScreen = ({txs, allTxs, goals = [], categoryGroups = [], period, setPeriod, years, onCopyBudget, onDeletePeriod, setSubPage, setEditTx, setAddOpen, onDelete, onDone, onCopy}) => {
   const [fS, setFS] = useState("all");
-  const [fG] = useState("all");
+  const [fG, setFG] = useState("all");
   const [fGoal, setFGoal] = useState("all");
   const [q, setQ] = useState("");
+  const [showFilters, setShowFilters] = useState(true);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const periodLabel = formatPeriodLabel(period);
   const openEdit = tx => {
     setEditTx(tx);
     setAddOpen(true);
   };
+
+  // Opsi grup diambil dari grup yang ada di transaksi periode ini (+ grup terpilih bila tidak ada lagi).
+  const groupOptions = useMemo(() => {
+    const ids = new Set(txs.filter(tx=>tx.type==="expense" && tx.grp).map(tx=>tx.grp));
+    if(fG !== "all") ids.add(fG);
+    return [...ids]
+      .map(id => ({id, label: categoryGroups.find(g=>g.id===id)?.label || GROUPS[id]?.label || id}))
+      .sort((a,b)=>a.label.localeCompare(b.label));
+  }, [txs, categoryGroups, fG]);
+
+  const anyFilterActive = fS!=="all" || fG!=="all" || fGoal!=="all" || q.trim()!=="";
+  const resetFilters = () => {setFS("all"); setFG("all"); setFGoal("all"); setQ("");};
 
   const filtered = useMemo(()=>txs.filter(tx=>{
     if(fS!=="all"&&tx.status!==fS) return false;
@@ -41,8 +54,9 @@ const TxListScreen = ({txs, allTxs, goals = [], period, setPeriod, years, onCopy
             <p style={{fontSize:18, fontWeight:700, margin:0}}>Transaksi</p>
             <p style={{fontSize:12, margin:"2px 0 0", opacity:0.8}}>{periodLabel}</p>
           </div>
-          <button style={{background:"rgba(255,255,255,0.2)", border:"none", borderRadius:10, padding:8, cursor:"pointer", color:"#fff", display:"flex"}}>
+          <button onClick={()=>setShowFilters(s=>!s)} aria-label="Tampilkan filter" style={{background:"rgba(255,255,255,0.2)", border:"none", borderRadius:10, padding:8, cursor:"pointer", color:"#fff", display:"flex", position:"relative"}}>
             <Filter size={16}/>
+            {anyFilterActive && <span style={{position:"absolute", top:5, right:5, width:7, height:7, background:C.gold, borderRadius:"50%", border:"1px solid #fff"}}/>}
           </button>
         </div>
         <div style={{position:"relative"}}>
@@ -58,14 +72,23 @@ const TxListScreen = ({txs, allTxs, goals = [], period, setPeriod, years, onCopy
         </div>
       </div>
 
+      {showFilters && (
       <div style={{background:"#fff", padding:"10px 14px", borderBottom:`1px solid ${C.borderL}`, display:"flex", flexDirection:"column", gap:8}}>
         <div style={{display:"flex", gap:6, overflowX:"auto", paddingBottom:2}}>
           <Pill active={fS==="all"} onClick={()=>setFS("all")}>Semua</Pill>
           {Object.entries(STATUS).map(([v,s])=><Pill key={v} active={fS===v} onClick={()=>setFS(v)}>{s.label}</Pill>)}
         </div>
+        <div style={{display:"flex", alignItems:"center", gap:8}}>
+          <span style={{fontSize:11, fontWeight:700, color:C.textM, flexShrink:0, minWidth:36}}>Grup:</span>
+          <select value={fG} onChange={e=>setFG(e.target.value)}
+            style={{flex:1, fontSize:11, padding:"5px 8px", borderRadius:8, border:`1px solid ${fG!=="all"?C.pri:C.border}`, background:"#fff", color:fG!=="all"?C.pri:C.text, fontWeight:fG!=="all"?"700":"400", outline:"none", cursor:"pointer"}}>
+            <option value="all">Semua Grup</option>
+            {groupOptions.map(g=><option key={g.id} value={g.id}>{g.label}</option>)}
+          </select>
+        </div>
         {goals.length > 0 && (
           <div style={{display:"flex", alignItems:"center", gap:8}}>
-            <span style={{fontSize:11, fontWeight:700, color:C.textM, flexShrink:0}}>Goal:</span>
+            <span style={{fontSize:11, fontWeight:700, color:C.textM, flexShrink:0, minWidth:36}}>Goal:</span>
             <select value={fGoal} onChange={e=>setFGoal(e.target.value)}
               style={{flex:1, fontSize:11, padding:"5px 8px", borderRadius:8, border:`1px solid ${fGoal!=="all"?C.pri:C.border}`, background:"#fff", color:fGoal!=="all"?C.pri:C.text, fontWeight:fGoal!=="all"?"700":"400", outline:"none", cursor:"pointer"}}>
               <option value="all">Semua Goal</option>
@@ -74,7 +97,11 @@ const TxListScreen = ({txs, allTxs, goals = [], period, setPeriod, years, onCopy
             </select>
           </div>
         )}
+        {anyFilterActive && (
+          <button type="button" onClick={resetFilters} style={{alignSelf:"flex-end", background:"none", border:"none", color:C.red, fontSize:11, fontWeight:800, cursor:"pointer"}}>Reset filter</button>
+        )}
       </div>
+      )}
 
       <div style={{padding:"12px 14px"}}>
         {filtered.length===0 && <p style={{textAlign:"center", color:C.textL, fontSize:13, padding:"3rem 0"}}>Tidak ada transaksi</p>}
