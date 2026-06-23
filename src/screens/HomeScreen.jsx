@@ -3,6 +3,7 @@ import {
   ArrowDown,
   ArrowRightLeft,
   ArrowUp,
+  BarChart3,
   Bell,
   Calculator,
   Check,
@@ -10,9 +11,13 @@ import {
   Clock,
   CloudOff,
   CloudCheck,
+  Copy,
+  CreditCard,
   Crown,
   FileDown,
+  LayoutGrid,
   Pencil,
+  PieChart,
   Plus,
   Receipt,
   Settings,
@@ -23,7 +28,7 @@ import {
   X,
 } from "lucide-react";
 import PeriodPicker from "../components/period/PeriodPicker";
-import { GROUPS } from "../constants/app";
+import { DEFAULT_QUICK_MENU, GROUPS } from "../constants/app";
 import { C } from "../constants/theme";
 import { fmt, fmtS } from "../utils/format";
 import { formatPeriodLabel, normalizePeriod } from "../utils/period";
@@ -46,10 +51,43 @@ const newShortcutForm = group => ({
   isActive:true,
 });
 
-const HomeScreen = ({txs, allTxs = [], goals = [], period, setPeriod, years, onCopyBudget, setTab, setSubPage, setEditTx, setAddOpen, quickShortcuts = [], accounts = [], categoryGroups = [], onOpenShortcut, onQuickShortcutsChange, openUpgrade, isPro = false, user, cloudUser = null, hasUnsyncedChanges = false, onCloudBackup}) => {
+// Katalog Menu Cepat. `run(ctx)` memakai handler dari props HomeScreen.
+const QUICK_ACTIONS = [
+  {id:"transfer",        label:"Transfer",      icon:ArrowRightLeft, color:C.blue,    run:ctx=>ctx.setSubPage("transfer")},
+  {id:"zakat",           label:"Zakat",         icon:Calculator,     color:C.pri,     run:ctx=>ctx.setSubPage("zakat")},
+  {id:"goals",           label:"Goals",         icon:Target,         color:C.gold,    run:ctx=>{ctx.setTab("goals-tab"); ctx.setSubPage(null);}},
+  {id:"export",          label:"Export",        icon:FileDown,       color:"#8b5cf6", pro:true, run:ctx=>(ctx.isPro ? ctx.setSubPage("share") : ctx.openUpgrade())},
+  {id:"group-recap",     label:"Rekap Grup",    icon:PieChart,       color:"#0891b2", run:ctx=>ctx.setSubPage("group-recap")},
+  {id:"tx-list",         label:"Transaksi",     icon:Receipt,        color:"#ea580c", run:ctx=>ctx.setSubPage("tx-list")},
+  {id:"accounts",        label:"Rekening",      icon:CreditCard,     color:"#0ea5e9", run:ctx=>ctx.setSubPage("accounts")},
+  {id:"copy-budget",     label:"Copy Bln Lalu", icon:Copy,           color:C.priD,    run:ctx=>ctx.onCopyBudget?.()},
+  {id:"reports",         label:"Laporan",       icon:BarChart3,      color:"#2563eb", run:ctx=>{ctx.setTab("reports"); ctx.setSubPage(null);}},
+  {id:"category-groups", label:"Kategori",      icon:LayoutGrid,     color:"#7c3aed", run:ctx=>ctx.setSubPage("category-groups")},
+];
+const QUICK_ACTION_MAP = Object.fromEntries(QUICK_ACTIONS.map(a=>[a.id, a]));
+const MAX_QUICK_MENU = 8;
+
+// Gabungkan konfigurasi tersimpan dengan katalog: buang id tak dikenal, tambahkan
+// item baru sebagai nonaktif. Tahan banting terhadap data lama/rusak.
+const mergeQuickMenu = config => {
+  const seen = new Set();
+  const ordered = [];
+  (Array.isArray(config) ? config : []).forEach(item => {
+    const id = item?.id;
+    if(QUICK_ACTION_MAP[id] && !seen.has(id)) {
+      ordered.push({id, active: item.active !== false});
+      seen.add(id);
+    }
+  });
+  QUICK_ACTIONS.forEach(a => { if(!seen.has(a.id)) ordered.push({id:a.id, active:false}); });
+  return ordered;
+};
+
+const HomeScreen = ({txs, allTxs = [], goals = [], period, setPeriod, years, onCopyBudget, setTab, setSubPage, setEditTx, setAddOpen, quickShortcuts = [], quickMenu = [], onQuickMenuChange, accounts = [], categoryGroups = [], onOpenShortcut, onQuickShortcutsChange, openUpgrade, isPro = false, user, cloudUser = null, hasUnsyncedChanges = false, onCloudBackup}) => {
   const [shortcutSheetOpen, setShortcutSheetOpen] = useState(false);
   const [shortcutForm, setShortcutForm] = useState(null);
   const [shortcutErr, setShortcutErr] = useState({});
+  const [menuSheetOpen, setMenuSheetOpen] = useState(false);
   const s = calcSummary(txs);
   const grps = calcGroups(txs);
   const cloudMeta = !cloudUser
@@ -184,6 +222,36 @@ const HomeScreen = ({txs, allTxs = [], goals = [], period, setPeriod, years, onC
     onQuickShortcutsChange?.(list.map((item, order)=>({...item, sortOrder:order})));
   };
 
+  // ── Menu Cepat (quick actions) ──
+  const menuCtx = {setSubPage, setTab, openUpgrade, onCopyBudget, isPro};
+  const mergedMenu = useMemo(()=>mergeQuickMenu(quickMenu), [quickMenu]);
+  const activeMenuCount = mergedMenu.filter(item=>item.active).length;
+  const activeMenu = mergedMenu
+    .filter(item=>item.active)
+    .slice(0, MAX_QUICK_MENU)
+    .map(item=>QUICK_ACTION_MAP[item.id])
+    .filter(Boolean);
+  const toggleMenu = id => {
+    onQuickMenuChange?.(mergedMenu.map(item=>{
+      if(item.id !== id) return item;
+      if(item.active) return {...item, active:false};
+      if(activeMenuCount >= MAX_QUICK_MENU) {
+        alert(`Maksimal ${MAX_QUICK_MENU} menu yang bisa tampil di Beranda. Matikan salah satu dulu.`);
+        return item;
+      }
+      return {...item, active:true};
+    }));
+  };
+  const moveMenu = (id, direction) => {
+    const list = [...mergedMenu];
+    const index = list.findIndex(item=>item.id === id);
+    const target = index + direction;
+    if(index < 0 || target < 0 || target >= list.length) return;
+    [list[index], list[target]] = [list[target], list[index]];
+    onQuickMenuChange?.(list);
+  };
+  const resetMenu = () => onQuickMenuChange?.(DEFAULT_QUICK_MENU.map(item=>({...item})));
+
   return (
     <div style={{flex:1, overflowY:"auto", paddingBottom:92, background:C.bg}}>
       {/* Header with greeting */}
@@ -233,21 +301,30 @@ const HomeScreen = ({txs, allTxs = [], goals = [], period, setPeriod, years, onC
 
       <div style={{padding:"14px", display:"flex", flexDirection:"column", gap:12}}>
 
-        {/* Quick actions */}
-        <div style={{display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:8}}>
-          {[
-            {icon:ArrowRightLeft, label:"Transfer", color:C.blue, action:()=>setSubPage("transfer")},
-            {icon:Calculator, label:"Zakat", color:C.pri, action:()=>setSubPage("zakat")},
-            {icon:Target, label:"Goals", color:C.gold, action:()=>{setTab("goals-tab"); setSubPage(null);}},
-            {icon:FileDown, label:"Export", color:"#8b5cf6", action:isPro ? ()=>setSubPage("share") : openUpgrade},
-          ].map((q,i)=>(
-            <button key={i} onClick={q.action} style={{background:"#fff", border:`1px solid ${C.borderL}`, borderRadius:14, padding:"10px 4px", cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", gap:4}}>
-              <div style={{width:36, height:36, borderRadius:10, background:q.color+"15", display:"flex", alignItems:"center", justifyContent:"center"}}>
-                <q.icon size={18} color={q.color}/>
-              </div>
-              <span style={{fontSize:10, fontWeight:600, color:C.textM}}>{q.label}</span>
+        {/* Quick actions (Menu Cepat) */}
+        <div>
+          <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8, padding:"0 2px"}}>
+            <p style={{fontSize:13, fontWeight:700, color:C.text, margin:0}}>Menu Cepat</p>
+            <button type="button" onClick={()=>setMenuSheetOpen(true)} style={{background:"none", border:"none", color:C.pri, fontSize:11, fontWeight:800, cursor:"pointer", display:"flex", alignItems:"center", gap:4}}>
+              <Settings size={13}/> Atur
             </button>
-          ))}
+          </div>
+          {activeMenu.length > 0 ? (
+            <div style={{display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:8}}>
+              {activeMenu.map(a=>(
+                <button key={a.id} onClick={()=>a.run(menuCtx)} style={{background:"#fff", border:`1px solid ${C.borderL}`, borderRadius:14, padding:"10px 4px", cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", gap:4}}>
+                  <div style={{width:36, height:36, borderRadius:10, background:a.color+"15", display:"flex", alignItems:"center", justifyContent:"center"}}>
+                    <a.icon size={18} color={a.color}/>
+                  </div>
+                  <span style={{fontSize:10, fontWeight:600, color:C.textM, textAlign:"center", lineHeight:1.2}}>{a.label}</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <button type="button" onClick={()=>setMenuSheetOpen(true)} style={{width:"100%", border:`1px dashed ${C.border}`, borderRadius:14, background:C.bg, padding:"14px", color:C.textM, fontSize:12, fontWeight:700, cursor:"pointer"}}>
+              Atur menu cepat
+            </button>
+          )}
         </div>
 
         {/* Quick transaction shortcuts */}
@@ -536,6 +613,54 @@ const HomeScreen = ({txs, allTxs = [], goals = [], period, setPeriod, years, onC
                   </div>
                 ))}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {menuSheetOpen && (
+        <div style={{position:"fixed", inset:0, background:"rgba(15,23,42,0.45)", zIndex:120, display:"flex", alignItems:"flex-end", justifyContent:"center"}}>
+          <div style={{width:"100%", maxWidth:430, background:"#fff", borderTopLeftRadius:24, borderTopRightRadius:24, maxHeight:"90vh", overflowY:"auto", animation:"slideUp 0.3s"}}>
+            <div style={{padding:"16px", borderBottom:`1px solid ${C.borderL}`, position:"sticky", top:0, background:"#fff", zIndex:2, display:"flex", alignItems:"center", justifyContent:"space-between"}}>
+              <div>
+                <p style={{fontSize:16, fontWeight:800, color:C.text, margin:0}}>Atur Menu Cepat</p>
+                <p style={{fontSize:11, color:C.textM, margin:"2px 0 0"}}>Nyalakan, matikan, dan urutkan. Maksimal {MAX_QUICK_MENU} tampil di Beranda.</p>
+              </div>
+              <button type="button" onClick={()=>setMenuSheetOpen(false)} aria-label="Tutup atur menu" style={{background:C.borderL, border:"none", borderRadius:10, padding:8, cursor:"pointer", display:"flex"}}>
+                <X size={16} color={C.textM}/>
+              </button>
+            </div>
+            <div style={{padding:"14px 14px calc(32px + env(safe-area-inset-bottom))", display:"flex", flexDirection:"column", gap:8}}>
+              <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:2}}>
+                <span style={{fontSize:11, color:C.textM, fontWeight:700}}>Aktif: {activeMenuCount}/{MAX_QUICK_MENU}</span>
+                <button type="button" onClick={resetMenu} style={{background:"none", border:"none", color:C.pri, fontSize:11, fontWeight:800, cursor:"pointer"}}>Reset ke default</button>
+              </div>
+              {mergedMenu.map((item, index)=>{
+                const a = QUICK_ACTION_MAP[item.id];
+                if(!a) return null;
+                return (
+                  <div key={item.id} style={{...card, boxShadow:"none", padding:"10px 12px", display:"flex", alignItems:"center", gap:10}}>
+                    <div style={{width:34, height:34, borderRadius:10, background:a.color+"15", color:a.color, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0}}>
+                      <a.icon size={17}/>
+                    </div>
+                    <div style={{flex:1, minWidth:0}}>
+                      <p style={{fontSize:13, fontWeight:800, color:C.text, margin:0, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>{a.label}{a.pro ? " (Pro)" : ""}</p>
+                      <p style={{fontSize:10, color:item.active?C.priD:C.textL, margin:"2px 0 0", fontWeight:700}}>{item.active ? "Tampil di Beranda" : "Disembunyikan"}</p>
+                    </div>
+                    <div style={{display:"flex", gap:4, flexShrink:0, alignItems:"center"}}>
+                      <button type="button" onClick={()=>moveMenu(item.id, -1)} disabled={index===0} aria-label="Naik" style={{width:30, height:30, borderRadius:9, border:`1px solid ${C.border}`, background:"#fff", color:index===0?C.textL:C.textM, cursor:index===0?"not-allowed":"pointer", display:"flex", alignItems:"center", justifyContent:"center"}}>
+                        <ArrowUp size={13}/>
+                      </button>
+                      <button type="button" onClick={()=>moveMenu(item.id, 1)} disabled={index===mergedMenu.length-1} aria-label="Turun" style={{width:30, height:30, borderRadius:9, border:`1px solid ${C.border}`, background:"#fff", color:index===mergedMenu.length-1?C.textL:C.textM, cursor:index===mergedMenu.length-1?"not-allowed":"pointer", display:"flex", alignItems:"center", justifyContent:"center"}}>
+                        <ArrowDown size={13}/>
+                      </button>
+                      <button type="button" onClick={()=>toggleMenu(item.id)} aria-label="Aktifkan atau nonaktifkan menu" style={{width:46, height:30, borderRadius:9, border:`1px solid ${item.active?C.priL:C.border}`, background:item.active?C.priBg:"#fff", color:item.active?C.priD:C.textM, fontSize:10, fontWeight:900, cursor:"pointer"}}>
+                        {item.active ? "ON" : "OFF"}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>

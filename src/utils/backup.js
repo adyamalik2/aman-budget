@@ -28,6 +28,7 @@ export const isValidBackupData = data => {
   if(data.categoryGroups !== undefined && (!Array.isArray(data.categoryGroups)||!data.categoryGroups.every(isRecord))) return false;
   if(data.transfers !== undefined && (!Array.isArray(data.transfers)||!data.transfers.every(isRecord))) return false;
   if(data.quickShortcuts !== undefined && (!Array.isArray(data.quickShortcuts)||!data.quickShortcuts.every(isRecord))) return false;
+  if(data.quickMenu !== undefined && (!Array.isArray(data.quickMenu)||!data.quickMenu.every(isRecord))) return false;
   if(data.user !== undefined && data.user !== null && !isRecord(data.user)) return false;
   if(data.period !== undefined && !isRecord(data.period)) return false;
   if(data.periodSetting !== undefined && !isRecord(data.periodSetting)) return false;

@@ -58,6 +58,18 @@ export const DEFAULT_QUICK_SHORTCUTS = [
   {id:"quick-zakat", label:"Zakat", type:"expense", group:"zakat_sedekah", category:"Zakat", description:"Zakat", amount:"", account:"", sortOrder:3, isActive:true, createdAt:"", updatedAt:""},
 ];
 
+// Menu Cepat (quick actions) di Beranda. id harus cocok dengan katalog QUICK_ACTIONS di HomeScreen.
+export const DEFAULT_QUICK_MENU = [
+  {id:"transfer", active:true},
+  {id:"zakat", active:true},
+  {id:"goals", active:true},
+  {id:"export", active:true},
+  {id:"group-recap", active:true},
+  {id:"tx-list", active:true},
+  {id:"accounts", active:true},
+  {id:"copy-budget", active:true},
+];
+
 export const STATUS = {
   estimasi: {label:"Estimasi", bg:"#fef9c3", color:"#854d0e"},
   selesai: {label:"Selesai", bg:"#dcfce7", color:"#166534"},
@@ -80,5 +92,6 @@ export const STORAGE_KEYS = {
   lastTxDate: "amanBudget.lastTransactionDate",
   transfers: "amanBudget.transfers",
   quickShortcuts: "amanBudget.quickShortcuts",
+  quickMenu: "amanBudget.quickMenu",
   backupMeta: "amanBudget.backupMeta",
 };
