@@ -3,11 +3,11 @@ import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis
 import Header from "../components/layout/Header";
 import PeriodPicker from "../components/period/PeriodPicker";
 import Badge from "../components/ui/Badge";
-import { GROUPS } from "../constants/app";
 import { C } from "../constants/theme";
 import { fmtS } from "../utils/format";
 import { formatPeriodLabel, getPrevMonthYear, isTxInPeriod, normalizePeriod } from "../utils/period";
 import { calcCashflowChartData, calcGroups, calcSummary } from "../utils/summary";
+import { getGroupColor, getGroupLabel } from "../utils/groups";
 
 const card = {background:"#fff", borderRadius:16, padding:"14px 16px", border:`1px solid ${C.borderL}`, boxShadow:"0 1px 4px rgba(0,0,0,0.03)"};
 
@@ -27,10 +27,10 @@ const DeltaRow = ({value, positiveIsGood}) => {
   );
 };
 
-const ReportsScreen = ({txs, allTxs = [], period, setPeriod, years, openUpgrade}) => {
+const ReportsScreen = ({txs, allTxs = [], categoryGroups = [], period, setPeriod, years, openUpgrade}) => {
   const s = calcSummary(txs);
   const grps = calcGroups(txs);
-  const pieData = Object.entries(grps).map(([k,v])=>({name:GROUPS[k]?.label, value:v.budget, color:GROUPS[k]?.color}));
+  const pieData = Object.entries(grps).map(([k,v])=>({name:getGroupLabel(k, categoryGroups), value:v.budget, color:getGroupColor(k, categoryGroups)}));
   const chartData = calcCashflowChartData(txs, period);
   const p = normalizePeriod(period);
   const chartTitle = p.mode === "range" ? "Arus Kas Bulanan" : "Arus Kas Mingguan";
@@ -150,7 +150,7 @@ const ReportsScreen = ({txs, allTxs = [], period, setPeriod, years, openUpgrade}
               <div style={{width:24, height:24, borderRadius:8, background:C.priL, color:C.priD, fontSize:11, fontWeight:800, display:"flex", alignItems:"center", justifyContent:"center"}}>{i+1}</div>
               <div style={{flex:1, minWidth:0}}>
                 <p style={{fontSize:12, fontWeight:600, color:C.text, margin:0, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{tx.desc}</p>
-                <p style={{fontSize:10, color:C.textL, margin:0}}>{GROUPS[tx.grp]?.label}</p>
+                <p style={{fontSize:10, color:C.textL, margin:0}}>{getGroupLabel(tx.grp, categoryGroups)}</p>
               </div>
               <span style={{fontSize:13, fontWeight:700, color:C.text}}>{fmtS(tx.amt)}</span>
             </div>

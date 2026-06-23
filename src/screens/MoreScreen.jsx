@@ -102,9 +102,6 @@ const MoreScreen = ({
               <p style={{fontSize:11, color:C.textM, margin:"2px 0"}}>{profileSubtitle}</p>
               {isPro ? <Badge bg={C.goldL} color={C.goldD}>PRO PLAN</Badge> : <Badge bg={C.borderL} color={C.textM}>FREE PLAN</Badge>}
             </div>
-            <button style={{background:"none", border:"none", cursor:"pointer", color:C.textM, padding:0}}>
-              <ChevronRight size={20}/>
-            </button>
           </div>
         </div>
 
@@ -115,7 +112,7 @@ const MoreScreen = ({
           </div>
           <div style={{flex:1}}>
             <p style={{fontSize:15, fontWeight:800, margin:0}}>Upgrade ke Pro</p>
-            <p style={{fontSize:11, opacity:0.9, margin:"2px 0 0"}}>Buka semua fitur premium · Mulai Rp 29rb/bulan</p>
+            <p style={{fontSize:11, opacity:0.9, margin:"2px 0 0"}}>Buka semua fitur premium · Mulai Rp 19rb/bulan</p>
           </div>
           <ChevronRight size={20}/>
         </button>
@@ -221,8 +218,8 @@ const MoreScreen = ({
             {icon:CreditCard, label:"Kelola Rekening", action:()=>setSubPage("accounts")},
             {icon:LayoutGrid, label:"Kategori & Grup", action:()=>setSubPage("category-groups")},
             {icon:Trash2, label:"Tong Sampah", action:()=>setTrashOpen(true)},
-            {icon:Shield, label:"Keamanan & Privasi"},
-            {icon:Star, label:"Beri Rating"},
+            {icon:Shield, label:"Keamanan & Privasi", action:()=>alert("Keamanan & Privasi\n\nData AMAN Budget disimpan di perangkat Anda. Backup ke cloud hanya berjalan saat Anda login Google dan menekan tombol Backup. Data tidak dibagikan ke pihak ketiga.\n\nKunci PIN/biometrik sedang disiapkan untuk versi berikutnya.")},
+            {icon:Star, label:"Beri Rating", action:()=>alert("Terima kasih! 🙏\n\nFitur beri rating akan aktif setelah AMAN Budget rilis resmi di Google Play.")},
           ].map((it, i) => (
             <button key={i} onClick={it.action} style={{width:"100%", padding:"12px 16px", background:"none", border:"none", borderTop: i>0?`1px solid ${C.borderL}`:"none", cursor:"pointer", display:"flex", alignItems:"center", gap:12, textAlign:"left"}}>
               <it.icon size={18} color={C.textM}/>

@@ -4,9 +4,10 @@ import PeriodPicker from "../components/period/PeriodPicker";
 import Badge from "../components/ui/Badge";
 import Pill from "../components/ui/Pill";
 import DeletePeriodSheet from "../features/transactions/DeletePeriodSheet";
-import { GROUPS, STATUS } from "../constants/app";
+import { STATUS } from "../constants/app";
 import { C } from "../constants/theme";
 import { fmtS } from "../utils/format";
+import { getGroupLabel } from "../utils/groups";
 import { formatPeriodLabel, formatShortDate } from "../utils/period";
 
 const TxListScreen = ({txs, allTxs, goals = [], categoryGroups = [], period, setPeriod, years, onCopyBudget, onDeletePeriod, setSubPage, setEditTx, setAddOpen, onDelete, onDone, onCopy}) => {
@@ -27,7 +28,7 @@ const TxListScreen = ({txs, allTxs, goals = [], categoryGroups = [], period, set
     const ids = new Set(txs.filter(tx=>tx.type==="expense" && tx.grp).map(tx=>tx.grp));
     if(fG !== "all") ids.add(fG);
     return [...ids]
-      .map(id => ({id, label: categoryGroups.find(g=>g.id===id)?.label || GROUPS[id]?.label || id}))
+      .map(id => ({id, label: getGroupLabel(id, categoryGroups)}))
       .sort((a,b)=>a.label.localeCompare(b.label));
   }, [txs, categoryGroups, fG]);
 
@@ -116,7 +117,7 @@ const TxListScreen = ({txs, allTxs, goals = [], categoryGroups = [], period, set
                   <p style={{fontSize:13, fontWeight:700, color:C.text, margin:0, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", lineHeight:1.25}}>{tx.desc}</p>
                   <div style={{display:"flex", alignItems:"center", gap:5, flexWrap:"wrap", marginTop:3}}>
                     <span style={{fontSize:10, color:C.textL, fontWeight:600}}>
-                      {tx.type==="income"?"Pemasukan":`${tx.cat || "Pengeluaran"} · ${GROUPS[tx.grp]?.label || "Lain-lain"}`} · {tx.pay}
+                      {tx.type==="income"?"Pemasukan":`${tx.cat || "Pengeluaran"} · ${getGroupLabel(tx.grp, categoryGroups)}`} · {tx.pay}
                     </span>
                     <Badge bg={STATUS[tx.status]?.bg} color={STATUS[tx.status]?.color}>{STATUS[tx.status]?.label}</Badge>
                     {goalName && (

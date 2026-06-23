@@ -3,9 +3,9 @@ import { ArrowDownWideNarrow, FolderTree, Filter, X } from "lucide-react";
 import Header from "../components/layout/Header";
 import PeriodPicker from "../components/period/PeriodPicker";
 import Pill from "../components/ui/Pill";
-import { GROUPS } from "../constants/app";
 import { C } from "../constants/theme";
 import { fmt, fmtS } from "../utils/format";
+import { getGroupColor as groupColor, getGroupLabel as groupLabel } from "../utils/groups";
 import { formatPeriodLabel } from "../utils/period";
 
 const card = {background:"#fff", borderRadius:16, padding:"14px 16px", border:`1px solid ${C.borderL}`, boxShadow:"0 1px 4px rgba(0,0,0,0.03)"};
@@ -17,11 +17,6 @@ const STATUS_FILTERS = [
   {value:"selesai", label:"Selesai"},
   {value:"belum_selesai", label:"Belum Bayar"},
 ];
-
-const groupLabel = (id, categoryGroups) =>
-  categoryGroups.find(group=>group.id === id)?.label || GROUPS[id]?.label || id;
-const groupColor = (id, categoryGroups) =>
-  categoryGroups.find(group=>group.id === id)?.color || GROUPS[id]?.color || C.textM;
 
 const GroupRecapScreen = ({txs = [], period, setPeriod, years, categoryGroups = [], setSubPage}) => {
   const [statusFilter, setStatusFilter] = useState("all");

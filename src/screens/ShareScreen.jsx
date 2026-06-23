@@ -6,14 +6,15 @@ import { Share } from "@capacitor/share";
 import { toJpeg } from "html-to-image";
 import Header from "../components/layout/Header";
 import PeriodPicker from "../components/period/PeriodPicker";
-import { GROUPS, STATUS } from "../constants/app";
+import { STATUS } from "../constants/app";
 import { C } from "../constants/theme";
 import { fmt, fmtS } from "../utils/format";
 import { calcGoalTransactionSaved } from "../utils/goals";
+import { getGroupColor, getGroupLabel } from "../utils/groups";
 import { formatPeriodLabel, formatShortDate, getPeriodYears, isTxInPeriod, normalizePeriod } from "../utils/period";
 import { calcGroups, calcSummary } from "../utils/summary";
 
-const resolveTxGrp = tx => (tx.grp && GROUPS[tx.grp]) ? tx.grp : "lain_lain";
+const resolveTxGrp = tx => tx.grp || "lain_lain";
 const isNativeApp = () => Capacitor.getPlatform() !== "web";
 const safeActionPad = "calc(24px + env(safe-area-inset-bottom))";
 
@@ -62,9 +63,9 @@ const shareJpgInNativeApp = async (dataUrl, fname) => {
   });
 };
 
-const GrpTable = ({grpKey, txList, goals}) => {
+const GrpTable = ({grpKey, txList, goals, categoryGroups = []}) => {
   const sub     = calcSubtotal(txList);
-  const grpInfo = GROUPS[grpKey];
+  const grpInfo = {color: getGroupColor(grpKey, categoryGroups), label: getGroupLabel(grpKey, categoryGroups)};
   const hasGoal = txList.some(tx => tx.goalId);
   return (
     <div className="rpt-sec" style={{marginBottom:5}}>
@@ -141,11 +142,11 @@ const ShareScreen = ({allTxs = [], goals = [], period = null, categoryGroups = [
   const periodLabel = formatPeriodLabel(selectedPeriod);
   const nativeApp   = isNativeApp();
   const filterGroups = categoryGroups
-    .filter(group=>group?.active !== false && GROUPS[group.id])
-    .map(group=>({key:group.id, label:group.label || GROUPS[group.id]?.label || group.id}));
+    .filter(group=>group?.active !== false && group?.id)
+    .map(group=>({key:group.id, label:getGroupLabel(group.id, categoryGroups)}));
   const selectedGroupLabel = selectedGroups.length === 0
     ? "Semua Grup"
-    : selectedGroups.map(key=>filterGroups.find(group=>group.key === key)?.label || GROUPS[key]?.label || key).join(" + ");
+    : selectedGroups.map(key=>getGroupLabel(key, categoryGroups)).join(" + ");
   const toggleGroup = key => {
     setSelectedGroups(prev=>prev.includes(key) ? prev.filter(item=>item !== key) : [...prev, key]);
   };
@@ -184,15 +185,17 @@ const ShareScreen = ({allTxs = [], goals = [], period = null, categoryGroups = [
 
   const groupedExpenses = useMemo(() => {
     const map = {};
-    Object.keys(GROUPS).forEach(k => { map[k] = []; });
     reportTxs.filter(tx => tx.type === "expense").forEach(tx => {
-      map[resolveTxGrp(tx)].push(tx);
+      const key = resolveTxGrp(tx);
+      (map[key] = map[key] || []).push(tx);
     });
     Object.keys(map).forEach(k => map[k].sort((a, b) => b.date.localeCompare(a.date)));
     return map;
   }, [reportTxs]);
 
-  const activeGroups  = Object.keys(GROUPS).filter(k => groupedExpenses[k]?.length > 0);
+  const activeGroups = Object.keys(groupedExpenses)
+    .filter(k => groupedExpenses[k]?.length > 0)
+    .sort((a, b) => calcSubtotal(groupedExpenses[b]).total - calcSubtotal(groupedExpenses[a]).total);
   const visibleGroups = selectedGroups.length === 0
     ? activeGroups
     : selectedGroups.filter(key=>groupedExpenses[key]?.length > 0);
@@ -222,7 +225,7 @@ const ShareScreen = ({allTxs = [], goals = [], period = null, categoryGroups = [
   waText += "```\n\n";
   waText += "📋 *REKAP PER GRUP*\n";
   Object.entries(grps).sort((a, b) => b[1].budget - a[1].budget).forEach(([k, v]) => {
-    waText += `• ${GROUPS[k]?.label} — ${fmt(v.budget)}\n`;
+    waText += `• ${getGroupLabel(k, categoryGroups)} — ${fmt(v.budget)}\n`;
   });
   waText += "\n";
   if (goalsCalc.length > 0) {
@@ -515,7 +518,7 @@ const ShareScreen = ({allTxs = [], goals = [], period = null, categoryGroups = [
 
               {/* Per-group expense sections */}
               {visibleGroups.map(grpKey => (
-                <GrpTable key={grpKey} grpKey={grpKey} txList={groupedExpenses[grpKey]} goals={goals}/>
+                <GrpTable key={grpKey} grpKey={grpKey} txList={groupedExpenses[grpKey]} goals={goals} categoryGroups={categoryGroups}/>
               ))}
 
               {visibleGroups.length === 0 && selectedGroups.length > 0 && (

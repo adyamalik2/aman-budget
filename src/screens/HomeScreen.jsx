@@ -34,6 +34,7 @@ import { fmt, fmtS } from "../utils/format";
 import { formatPeriodLabel, normalizePeriod } from "../utils/period";
 import { calcGroups, calcSummary } from "../utils/summary";
 import { getGoalDisplayedSaved } from "../utils/goals";
+import { getGroupColor, getGroupLabel } from "../utils/groups";
 
 const card = {background:"#fff", borderRadius:16, padding:"14px 16px", border:`1px solid ${C.borderL}`, boxShadow:"0 1px 4px rgba(0,0,0,0.03)"};
 const inp = {width:"100%", border:`1.5px solid ${C.border}`, borderRadius:12, padding:"11px 14px", fontSize:14, outline:"none", boxSizing:"border-box", background:"#fff", color:C.text};
@@ -338,7 +339,7 @@ const HomeScreen = ({txs, allTxs = [], goals = [], period, setPeriod, years, onC
           {activeShortcuts.length > 0 ? (
             <div style={{display:"grid", gridTemplateColumns:"repeat(2, minmax(0, 1fr))", gap:8}}>
               {activeShortcuts.slice(0, 6).map(shortcut => {
-                const groupColor = GROUPS[shortcut.group]?.color || C.pri;
+                const groupColor = shortcut.group ? getGroupColor(shortcut.group, categoryGroups) : C.pri;
                 return (
                   <button key={shortcut.id} type="button" onClick={()=>onOpenShortcut?.(shortcut)} style={{border:`1px solid ${C.borderL}`, borderRadius:14, background:"#fff", padding:"10px", cursor:"pointer", textAlign:"left", minHeight:64}}>
                     <div style={{display:"flex", alignItems:"center", gap:8}}>
@@ -347,7 +348,7 @@ const HomeScreen = ({txs, allTxs = [], goals = [], period, setPeriod, years, onC
                       </div>
                       <div style={{minWidth:0}}>
                         <p style={{fontSize:12, fontWeight:800, color:C.text, margin:0, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>{shortcut.label}</p>
-                        <p style={{fontSize:10, color:C.textL, margin:"2px 0 0", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>{shortcut.category || (shortcut.type === "income" ? "Pemasukan" : GROUPS[shortcut.group]?.label || "Pengeluaran")}</p>
+                        <p style={{fontSize:10, color:C.textL, margin:"2px 0 0", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>{shortcut.category || (shortcut.type === "income" ? "Pemasukan" : shortcut.group ? getGroupLabel(shortcut.group, categoryGroups) : "Pengeluaran")}</p>
                       </div>
                     </div>
                   </button>
@@ -437,7 +438,7 @@ const HomeScreen = ({txs, allTxs = [], goals = [], period, setPeriod, years, onC
               <div key={tx.id} onClick={()=>{setEditTx(tx); setAddOpen(true);}} style={{display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 0", borderTop:`1px solid ${C.borderL}`, cursor:"pointer"}}>
                 <div>
                   <p style={{fontSize:13, fontWeight:600, color:C.text, margin:0}}>{tx.desc}</p>
-                  <p style={{fontSize:10, color:C.textL, margin:0}}>{GROUPS[tx.grp]?.label}</p>
+                  <p style={{fontSize:10, color:C.textL, margin:0}}>{getGroupLabel(tx.grp, categoryGroups)}</p>
                 </div>
                 <span style={{fontSize:13, fontWeight:700, color:C.red}}>{fmtS(tx.amt)}</span>
               </div>
@@ -455,10 +456,10 @@ const HomeScreen = ({txs, allTxs = [], goals = [], period, setPeriod, years, onC
           </div>
           {Object.entries(grps).slice(0,5).map(([g,v])=>(
             <div key={g} style={{display:"flex", alignItems:"center", gap:10, marginBottom:10}}>
-              <div style={{width:8, height:8, borderRadius:"50%", background:GROUPS[g]?.color}}/>
-              <span style={{fontSize:12, color:C.text, fontWeight:600, flex:1}}>{GROUPS[g]?.label}</span>
+              <div style={{width:8, height:8, borderRadius:"50%", background:getGroupColor(g, categoryGroups)}}/>
+              <span style={{fontSize:12, color:C.text, fontWeight:600, flex:1}}>{getGroupLabel(g, categoryGroups)}</span>
               <div style={{width:64, background:C.borderL, borderRadius:6, height:5, overflow:"hidden"}}>
-                <div style={{background:GROUPS[g]?.color, height:"100%", width:v.budget>0?`${Math.min(v.paid/v.budget*100,100)}%`:"0%"}}/>
+                <div style={{background:getGroupColor(g, categoryGroups), height:"100%", width:v.budget>0?`${Math.min(v.paid/v.budget*100,100)}%`:"0%"}}/>
               </div>
               <span style={{fontSize:11, fontWeight:700, color:C.text, minWidth:60, textAlign:"right"}}>{fmtS(v.budget)}</span>
             </div>
@@ -475,12 +476,12 @@ const HomeScreen = ({txs, allTxs = [], goals = [], period, setPeriod, years, onC
           </div>
           {recent.map(tx=>(
             <div key={tx.id} onClick={()=>{setEditTx(tx); setAddOpen(true);}} style={{display:"flex", alignItems:"center", gap:10, padding:"10px 0", borderTop:`1px solid ${C.borderL}`, cursor:"pointer"}}>
-              <div style={{width:36, height:36, borderRadius:10, background: tx.type==="income"?C.priL:GROUPS[tx.grp]?.color+"15", display:"flex", alignItems:"center", justifyContent:"center"}}>
-                {tx.type==="income" ? <TrendingUp size={16} color={C.pri}/> : <Receipt size={16} color={GROUPS[tx.grp]?.color}/>}
+              <div style={{width:36, height:36, borderRadius:10, background: tx.type==="income"?C.priL:getGroupColor(tx.grp, categoryGroups)+"15", display:"flex", alignItems:"center", justifyContent:"center"}}>
+                {tx.type==="income" ? <TrendingUp size={16} color={C.pri}/> : <Receipt size={16} color={getGroupColor(tx.grp, categoryGroups)}/>}
               </div>
               <div style={{flex:1, minWidth:0}}>
                 <p style={{fontSize:13, fontWeight:600, color:C.text, margin:0, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>{tx.desc}</p>
-                <p style={{fontSize:10, color:C.textL, margin:0}}>{tx.date.slice(8,10)}/{tx.date.slice(5,7)} · {tx.type==="income"?"Pemasukan":GROUPS[tx.grp]?.label}</p>
+                <p style={{fontSize:10, color:C.textL, margin:0}}>{tx.date.slice(8,10)}/{tx.date.slice(5,7)} · {tx.type==="income"?"Pemasukan":getGroupLabel(tx.grp, categoryGroups)}</p>
               </div>
               <span style={{fontSize:13, fontWeight:700, color: tx.type==="income"?C.pri:C.text}}>{tx.type==="income"?"+":"−"}{fmtS(tx.amt)}</span>
             </div>
@@ -589,7 +590,7 @@ const HomeScreen = ({txs, allTxs = [], goals = [], period, setPeriod, years, onC
                           </span>
                         </div>
                         <p style={{fontSize:10, color:C.textM, margin:0, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>
-                          {shortcut.type === "income" ? "Pemasukan" : GROUPS[shortcut.group]?.label || "Pengeluaran"}{shortcut.category ? ` · ${shortcut.category}` : ""}{shortcut.amount ? ` · ${fmtS(Number(shortcut.amount))}` : ""}
+                          {shortcut.type === "income" ? "Pemasukan" : shortcut.group ? getGroupLabel(shortcut.group, categoryGroups) : "Pengeluaran"}{shortcut.category ? ` · ${shortcut.category}` : ""}{shortcut.amount ? ` · ${fmtS(Number(shortcut.amount))}` : ""}
                         </p>
                       </div>
                       <div style={{display:"flex", gap:4, flexWrap:"wrap", justifyContent:"flex-end"}}>
