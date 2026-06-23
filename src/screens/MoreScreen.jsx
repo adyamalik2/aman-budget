@@ -237,7 +237,7 @@ const MoreScreen = ({
         </button>
 
         <p style={{textAlign:"center", fontSize:10, color:C.textL, marginTop:4}}>
-          AMAN Budget v1.0.0 · © 2026 AMAN Digital<br/>amandigital.web.id
+          AMAN Budget v1.1.0 · © 2026 AMAN Digital<br/>amandigital.web.id
         </p>
       </div>
       {trashOpen && (

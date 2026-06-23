@@ -1,4 +1,4 @@
-﻿$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Stop"
 
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $ProjectRoot
@@ -24,30 +24,17 @@ Write-Host "`n[3/5] Using Java:" -ForegroundColor Yellow
 java -version
 
 $androidDir = Join-Path $ProjectRoot "android"
-Set-Location $androidDir
 
-$storeFile = "D:\KEYSTORES\aman-budget-release.keystore"
-if (!(Test-Path $storeFile)) {
-  throw "Keystore tidak ditemukan di: $storeFile"
+# Kredensial signing dibaca otomatis oleh Gradle dari android/keystore.properties.
+$keystoreProps = Join-Path $androidDir "keystore.properties"
+if (!(Test-Path $keystoreProps)) {
+  throw "android/keystore.properties tidak ditemukan. Salin android/keystore.properties.example lalu isi storeFile/storePassword/keyAlias/keyPassword."
 }
 
-Write-Host "`n[4/5] Signing release APK..." -ForegroundColor Yellow
-$STORE_PASS_SEC = Read-Host "Masukkan keystore password" -AsSecureString
-$KEY_PASS_SEC = Read-Host "Masukkan key password" -AsSecureString
+Set-Location $androidDir
 
-$STORE_PASS = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($STORE_PASS_SEC))
-$KEY_PASS = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($KEY_PASS_SEC))
-
-$gradleArgs = @(
-  "assembleRelease",
-  "-Dorg.gradle.java.home=$javaHome",
-  "-Pandroid.injected.signing.store.file=$storeFile",
-  "-Pandroid.injected.signing.store.password=$STORE_PASS",
-  "-Pandroid.injected.signing.key.alias=aman-budget",
-  "-Pandroid.injected.signing.key.password=$KEY_PASS"
-)
-
-& .\gradlew.bat @gradleArgs
+Write-Host "`n[4/5] Building signed release APK..." -ForegroundColor Yellow
+& .\gradlew.bat assembleRelease "-Dorg.gradle.java.home=$javaHome"
 
 Write-Host "`n[5/5] Copy APK to android/app/release..." -ForegroundColor Yellow
 $sourceApk = Join-Path $androidDir "app\build\outputs\apk\release\app-release.apk"
@@ -57,6 +44,6 @@ $targetApk = Join-Path $targetDir "app-release.apk"
 New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
 Copy-Item $sourceApk $targetApk -Force
 
-Write-Host "`nBUILD RELEASE APK SELESAI ✅" -ForegroundColor Green
+Write-Host "`nBUILD RELEASE APK SELESAI" -ForegroundColor Green
 Write-Host "APK final:" -ForegroundColor Green
 Write-Host $targetApk -ForegroundColor Cyan

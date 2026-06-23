@@ -34,6 +34,10 @@ android/app/google-services.json
 *.keystore
 *.jks
 
+# Signing credentials (jangan pernah di-commit)
+keystore.properties
+android/keystore.properties
+
 .env
 .env.local
 .env.*.local
