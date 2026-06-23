@@ -4,17 +4,13 @@ const goalKey = goal => norm(goal?.id || goal?.name);
 
 export const isGoalCompletedTx = tx => DONE_STATUSES.has(norm(tx?.status));
 
+// Hanya hitung transaksi yang SECARA EKSPLISIT terhubung ke goal lewat goalId
+// (pilihan "Hubungkan ke Goal" saat input). Pencocokan nama/kategori/deskripsi
+// dihapus karena bisa salah hitung transaksi yang tidak terkait.
 export const isTxMatchGoal = (tx, goal) => {
   const linkedGoalId = norm(tx?.goalId);
-  if(linkedGoalId) return linkedGoalId === goalKey(goal);
-
-  const goalName = norm(goal?.name);
-  if(!goalName) return false;
-
-  const category = norm(tx?.cat ?? tx?.category);
-  if(category === goalName) return true;
-
-  return [tx?.title, tx?.name, tx?.desc, tx?.description].some(value => norm(value).includes(goalName));
+  if(!linkedGoalId) return false;
+  return linkedGoalId === goalKey(goal);
 };
 
 export const calcGoalTransactionSaved = (txs, goal) => (txs || []).reduce((sum, tx) => {

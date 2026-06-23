@@ -100,7 +100,7 @@ const MoreScreen = ({
             <div style={{flex:1}}>
               <p style={{fontSize:15, fontWeight:700, color:C.text, margin:0}}>{profileName}</p>
               <p style={{fontSize:11, color:C.textM, margin:"2px 0"}}>{profileSubtitle}</p>
-              <Badge bg={C.borderL} color={C.textM}>FREE PLAN</Badge>
+              {isPro ? <Badge bg={C.goldL} color={C.goldD}>PRO PLAN</Badge> : <Badge bg={C.borderL} color={C.textM}>FREE PLAN</Badge>}
             </div>
             <button style={{background:"none", border:"none", cursor:"pointer", color:C.textM, padding:0}}>
               <ChevronRight size={20}/>
@@ -232,7 +232,7 @@ const MoreScreen = ({
           ))}
         </div>
 
-        <button onClick={onLogout} style={{...card, color:C.red, border:"none", display:"flex", alignItems:"center", justifyContent:"center", gap:8, fontSize:13, fontWeight:700, cursor:"pointer"}}>
+        <button onClick={()=>{if(window.confirm("Keluar dari akun? Data tetap tersimpan di perangkat ini.")) onLogout();}} style={{...card, color:C.red, border:"none", display:"flex", alignItems:"center", justifyContent:"center", gap:8, fontSize:13, fontWeight:700, cursor:"pointer"}}>
           <LogOut size={16}/> Keluar Akun
         </button>
 

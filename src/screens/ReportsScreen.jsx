@@ -1,4 +1,4 @@
-import { ChevronRight, Sparkles, TrendingUp } from "lucide-react";
+import { ChevronRight, Sparkles, TrendingDown, TrendingUp } from "lucide-react";
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import Header from "../components/layout/Header";
 import PeriodPicker from "../components/period/PeriodPicker";
@@ -6,18 +6,46 @@ import Badge from "../components/ui/Badge";
 import { GROUPS } from "../constants/app";
 import { C } from "../constants/theme";
 import { fmtS } from "../utils/format";
-import { formatPeriodLabel, normalizePeriod } from "../utils/period";
+import { formatPeriodLabel, getPrevMonthYear, isTxInPeriod, normalizePeriod } from "../utils/period";
 import { calcCashflowChartData, calcGroups, calcSummary } from "../utils/summary";
 
 const card = {background:"#fff", borderRadius:16, padding:"14px 16px", border:`1px solid ${C.borderL}`, boxShadow:"0 1px 4px rgba(0,0,0,0.03)"};
 
-const ReportsScreen = ({txs, period, setPeriod, years, openUpgrade}) => {
+// % perubahan vs nilai sebelumnya; null bila tidak ada pembanding.
+const pctDelta = (current, previous) => (previous > 0 ? Math.round((current - previous) / previous * 100) : null);
+
+// Baris perbandingan vs bulan lalu. positiveIsGood: true untuk pemasukan, false untuk pengeluaran.
+const DeltaRow = ({value, positiveIsGood}) => {
+  if(value === null) return <div style={{fontSize:10, color:C.textL, fontWeight:600}}>Belum ada pembanding bulan lalu</div>;
+  const up = value >= 0;
+  const Icon = up ? TrendingUp : TrendingDown;
+  const color = value === 0 ? C.textM : ((positiveIsGood ? up : !up) ? C.pri : C.red);
+  return (
+    <div style={{display:"flex", alignItems:"center", gap:3, fontSize:10, color, fontWeight:600}}>
+      <Icon size={11}/> {up?"+":""}{value}% vs bulan lalu
+    </div>
+  );
+};
+
+const ReportsScreen = ({txs, allTxs = [], period, setPeriod, years, openUpgrade}) => {
   const s = calcSummary(txs);
   const grps = calcGroups(txs);
   const pieData = Object.entries(grps).map(([k,v])=>({name:GROUPS[k]?.label, value:v.budget, color:GROUPS[k]?.color}));
   const chartData = calcCashflowChartData(txs, period);
-  const chartTitle = normalizePeriod(period).mode === "range" ? "Arus Kas Bulanan" : "Arus Kas Mingguan";
+  const p = normalizePeriod(period);
+  const chartTitle = p.mode === "range" ? "Arus Kas Bulanan" : "Arus Kas Mingguan";
   const periodLabel = formatPeriodLabel(period);
+
+  // Perbandingan bulan lalu hanya untuk mode bulanan (range tidak punya "bulan lalu" yang jelas).
+  let incomeDelta = null;
+  let expenseDelta = null;
+  if(p.mode === "month") {
+    const prev = getPrevMonthYear(p.month, p.year);
+    const prevTxs = allTxs.filter(tx=>isTxInPeriod(tx, {mode:"month", month:prev.month, year:prev.year}));
+    const ps = calcSummary(prevTxs);
+    incomeDelta = pctDelta(s.totalIncome, ps.totalIncome);
+    expenseDelta = pctDelta(s.paid, ps.paid);
+  }
 
   const top5 = txs.filter(x=>x.type==="expense"&&x.status!=="batal").sort((a,b)=>b.amt-a.amt).slice(0,5);
 
@@ -35,16 +63,12 @@ const ReportsScreen = ({txs, period, setPeriod, years, openUpgrade}) => {
           <div style={{...card, background:`linear-gradient(135deg, ${C.priBg}, #fff)`}}>
             <p style={{fontSize:10, color:C.textM, margin:0, fontWeight:600, letterSpacing:0.3}}>PEMASUKAN</p>
             <p style={{fontSize:17, fontWeight:800, color:C.pri, margin:"4px 0"}}>{fmtS(s.totalIncome)}</p>
-            <div style={{display:"flex", alignItems:"center", gap:3, fontSize:10, color:C.pri, fontWeight:600}}>
-              <TrendingUp size={11}/> +12% vs bulan lalu
-            </div>
+            <DeltaRow value={incomeDelta} positiveIsGood/>
           </div>
           <div style={{...card, background:`linear-gradient(135deg, #fef2f2, #fff)`}}>
             <p style={{fontSize:10, color:C.textM, margin:0, fontWeight:600, letterSpacing:0.3}}>PENGELUARAN</p>
             <p style={{fontSize:17, fontWeight:800, color:C.red, margin:"4px 0"}}>{fmtS(s.paid)}</p>
-            <div style={{display:"flex", alignItems:"center", gap:3, fontSize:10, color:C.red, fontWeight:600}}>
-              <TrendingUp size={11}/> +5% vs bulan lalu
-            </div>
+            <DeltaRow value={expenseDelta} positiveIsGood={false}/>
           </div>
         </div>
 
@@ -66,7 +90,7 @@ const ReportsScreen = ({txs, period, setPeriod, years, openUpgrade}) => {
                 <div key={i} style={{display:"flex", alignItems:"center", gap:6, fontSize:11}}>
                   <div style={{width:8, height:8, borderRadius:"50%", background:d.color}}/>
                   <span style={{flex:1, color:C.textM, fontWeight:600}}>{d.name}</span>
-                  <span style={{color:C.text, fontWeight:700}}>{Math.round(d.value/s.estExp*100)}%</span>
+                  <span style={{color:C.text, fontWeight:700}}>{s.estExp>0 ? Math.round(d.value/s.estExp*100) : 0}%</span>
                 </div>
               ))}
             </div>
@@ -109,7 +133,7 @@ const ReportsScreen = ({txs, period, setPeriod, years, openUpgrade}) => {
                 <Badge bg={C.gold} color="#fff">PRO</Badge>
               </div>
               <p style={{fontSize:12, color:C.textM, margin:"0 0 8px", lineHeight:1.5}}>
-                Pengeluaran kategori <b>Belanja</b> naik 23% bulan ini. Pertimbangkan untuk mengurangi pembelian impulsif di minggu ke-2.
+                Dapatkan analisa otomatis pola pengeluaran tiap bulan beserta saran hemat yang dipersonalisasi dengan AMAN Budget Pro.
               </p>
               <button onClick={openUpgrade} style={{background:"none", border:"none", color:C.goldD, fontSize:11, fontWeight:700, padding:0, cursor:"pointer", display:"flex", alignItems:"center", gap:4}}>
                 Aktifkan Pro <ChevronRight size={12}/>

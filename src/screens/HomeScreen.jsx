@@ -79,9 +79,14 @@ const HomeScreen = ({txs, allTxs = [], goals = [], period, setPeriod, years, onC
       })
     : null;
   const unpaidItems = txs.filter(x=>x.status==="belum_selesai").slice(0, 3);
+  const unpaidCount = txs.filter(x=>x.status==="belum_selesai").length;
   const recent = [...txs].sort((a,b)=>b.date.localeCompare(a.date)).slice(0, 4);
   const periodMode = normalizePeriod(period).mode;
   const periodLabel = formatPeriodLabel(period);
+  const handleBellClick = () => {
+    if(unpaidCount > 0) alert(`Pengingat: ada ${unpaidCount} tagihan belum dibayar senilai ${fmt(s.unpaid)} pada ${periodLabel}.`);
+    else alert("Belum ada pengingat. Tagihan berstatus \"Belum Bayar\" akan muncul di sini.");
+  };
   const activeGroupOptions = categoryGroups
     .filter(group=>group?.active !== false && group?.id)
     .map(group=>({id:group.id, label:group.label || GROUPS[group.id]?.label || group.id}));
@@ -195,9 +200,9 @@ const HomeScreen = ({txs, allTxs = [], goals = [], period, setPeriod, years, onC
             <button type="button" onClick={handleCloudClick} title={cloudMeta.label} aria-label={cloudMeta.label} style={{width:36, height:36, background:"rgba(255,255,255,0.15)", border:"none", borderRadius:10, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff"}}>
               <CloudIcon size={17} color={cloudMeta.color}/>
             </button>
-            <button style={{width:36, height:36, background:"rgba(255,255,255,0.15)", border:"none", borderRadius:10, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", position:"relative"}}>
+            <button onClick={handleBellClick} aria-label="Notifikasi" style={{width:36, height:36, background:"rgba(255,255,255,0.15)", border:"none", borderRadius:10, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", position:"relative"}}>
               <Bell size={17}/>
-              <span style={{position:"absolute", top:7, right:7, width:7, height:7, background:C.gold, borderRadius:"50%"}}/>
+              {unpaidCount > 0 && <span style={{position:"absolute", top:7, right:7, width:7, height:7, background:C.gold, borderRadius:"50%"}}/>}
             </button>
           </div>
         </div>
