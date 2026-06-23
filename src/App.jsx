@@ -12,6 +12,7 @@ import UpgradeScreen from "./screens/UpgradeScreen";
 import MoreScreen from "./screens/MoreScreen";
 import AccountsScreen from "./screens/AccountsScreen";
 import CategoryGroupsScreen from "./screens/CategoryGroupsScreen";
+import GroupRecapScreen from "./screens/GroupRecapScreen";
 import ReportsScreen from "./screens/ReportsScreen";
 import TxListScreen from "./screens/TxListScreen";
 import ShareScreen from "./screens/ShareScreen";
@@ -543,6 +544,7 @@ export default function App() {
     if(subPage==="zakat") return <ZakatScreen setSubPage={setSubPage} onAddZakatBudget={onAddZakatBudget}/>;
     if(subPage==="accounts") return <AccountsScreen accounts={accounts} txs={txs} onAccountsChange={onAccountsChange} setSubPage={setSubPage}/>;
     if(subPage==="category-groups") return <CategoryGroupsScreen categoryGroups={categoryGroups} txs={txs} onCategoryGroupsChange={onCategoryGroupsChange} setSubPage={setSubPage}/>;
+    if(subPage==="group-recap") return <GroupRecapScreen txs={periodTxs} period={period} setPeriod={updatePeriod} years={periodYears} categoryGroups={categoryGroups} setSubPage={setSubPage}/>;
     if(subPage==="tx-list") return <TxListScreen txs={periodTxs} allTxs={activeTxs} goals={goals} period={period} setPeriod={updatePeriod} years={periodYears} onCopyBudget={onCopyBudget} onDeletePeriod={onDeletePeriod} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={(open)=>{if(open) setAddPreset(null); setAddOpen(open);}} onDelete={onDelete} onDone={onDone} onCopy={onCopyTx}/>;
     if(subPage==="share") return <ShareScreen txs={periodTxs} allTxs={activeTxs} goals={goals} period={period} categoryGroups={categoryGroups} setSubPage={setSubPage}/>;
     if(tab==="home") return <HomeScreen txs={periodTxs} allTxs={activeTxs} goals={goals} period={period} setPeriod={updatePeriod} years={periodYears} onCopyBudget={onCopyBudget} setTab={setTab} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={(open)=>{if(open) setAddPreset(null); setAddOpen(open);}} quickShortcuts={quickShortcuts} accounts={accounts} categoryGroups={categoryGroups} onOpenShortcut={onOpenShortcut} onQuickShortcutsChange={onQuickShortcutsChange} openUpgrade={openUpgrade} isPro={isPro} user={appUser} cloudUser={cloudUser} hasUnsyncedChanges={hasUnsyncedChanges} onCloudBackup={onCloudBackup}/>;

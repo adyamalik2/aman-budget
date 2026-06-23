@@ -367,7 +367,7 @@ const HomeScreen = ({txs, allTxs = [], goals = [], period, setPeriod, years, onC
         <div style={card}>
           <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12}}>
             <p style={{fontSize:13, fontWeight:700, color:C.text, margin:0}}>Rekap per Grup</p>
-            <button onClick={()=>setSubPage("transfer")} style={{background:"none", border:"none", color:C.pri, fontSize:11, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", gap:2}}>
+            <button onClick={()=>setSubPage("group-recap")} style={{background:"none", border:"none", color:C.pri, fontSize:11, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", gap:2}}>
               Detail <ChevronRight size={12}/>
             </button>
           </div>

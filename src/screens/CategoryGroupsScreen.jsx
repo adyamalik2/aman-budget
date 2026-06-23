@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Check, FolderTree, Pencil, Plus, Tag, Trash2, X } from "lucide-react";
+import { Check, FolderTree, Pencil, Plus, Search, Tag, Trash2, X } from "lucide-react";
 import Header from "../components/layout/Header";
 import Badge from "../components/ui/Badge";
+import Pill from "../components/ui/Pill";
 import { C } from "../constants/theme";
 
 const card = {background:"#fff", borderRadius:16, padding:"14px 16px", border:`1px solid ${C.borderL}`, boxShadow:"0 1px 4px rgba(0,0,0,0.03)"};
@@ -19,10 +20,22 @@ const CategoryGroupsScreen = ({categoryGroups = [], txs = [], onCategoryGroupsCh
   const [groupSheet, setGroupSheet] = useState(null);
   const [categorySheet, setCategorySheet] = useState(null);
   const [err, setErr] = useState("");
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all"); // all | active | inactive
   const sortedGroups = [...categoryGroups].sort((a,b)=>{
     if((a.active === false) !== (b.active === false)) return a.active === false ? 1 : -1;
     return (a.label || "").localeCompare(b.label || "");
   });
+  const query = search.trim().toLowerCase();
+  const matchesGroup = group => {
+    if(statusFilter === "active" && group.active === false) return false;
+    if(statusFilter === "inactive" && group.active !== false) return false;
+    if(!query) return true;
+    if((group.label || "").toLowerCase().includes(query)) return true;
+    return (group.categories || []).some(category => (category.name || "").toLowerCase().includes(query));
+  };
+  const filteredGroups = sortedGroups.filter(matchesGroup);
+  const hasFilter = statusFilter !== "all" || query !== "";
   const isGroupUsed = group => txs.some(tx=>tx.grp === group.id);
   const isCategoryUsed = (group, category) => txs.some(tx=>tx.grp === group.id && normalizeName(tx.cat) === normalizeName(category.name));
 
@@ -171,6 +184,28 @@ const CategoryGroupsScreen = ({categoryGroups = [], txs = [], onCategoryGroupsCh
           <p style={{fontSize:11, color:C.priD, margin:0, lineHeight:1.45}}>Data nonaktif tidak muncul di pilihan transaksi baru, tetapi transaksi lama tetap aman.</p>
         </div>
 
+        {/* Filter */}
+        {categoryGroups.length > 0 && (
+          <div style={{...card, display:"flex", flexDirection:"column", gap:10}}>
+            <div style={{position:"relative"}}>
+              <Search size={15} style={{position:"absolute", left:12, top:12, color:C.textL}}/>
+              <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Cari grup atau kategori..."
+                style={{...inp, padding:"11px 14px 11px 36px"}}/>
+            </div>
+            <div style={{display:"flex", gap:6, overflowX:"auto", paddingBottom:2}}>
+              <Pill active={statusFilter==="all"} onClick={()=>setStatusFilter("all")}>Semua</Pill>
+              <Pill active={statusFilter==="active"} onClick={()=>setStatusFilter("active")}>Aktif</Pill>
+              <Pill active={statusFilter==="inactive"} onClick={()=>setStatusFilter("inactive")}>Nonaktif</Pill>
+              {hasFilter && (
+                <button type="button" onClick={()=>{setSearch(""); setStatusFilter("all");}}
+                  style={{marginLeft:"auto", background:"none", border:"none", color:C.red, fontSize:11, fontWeight:800, cursor:"pointer", display:"flex", alignItems:"center", gap:3, whiteSpace:"nowrap"}}>
+                  <X size={12}/> Reset
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         {categoryGroups.length === 0 && (
           <div style={{...card, textAlign:"center", padding:"28px 16px"}}>
             <div style={{width:46, height:46, borderRadius:14, background:C.priL, color:C.pri, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 10px"}}>
@@ -181,7 +216,14 @@ const CategoryGroupsScreen = ({categoryGroups = [], txs = [], onCategoryGroupsCh
           </div>
         )}
 
-        {sortedGroups.map(group => {
+        {categoryGroups.length > 0 && filteredGroups.length === 0 && (
+          <div style={{...card, textAlign:"center", padding:"24px 16px"}}>
+            <p style={{fontSize:13, fontWeight:700, color:C.text, margin:"0 0 4px"}}>Tidak ada grup yang cocok</p>
+            <p style={{fontSize:11, color:C.textM, margin:0}}>Ubah kata kunci atau filter status.</p>
+          </div>
+        )}
+
+        {filteredGroups.map(group => {
           const categories = (Array.isArray(group.categories) ? [...group.categories] : []).sort((a,b)=>{
             if((a.active === false) !== (b.active === false)) return a.active === false ? 1 : -1;
             return (a.name || "").localeCompare(b.name || "");
