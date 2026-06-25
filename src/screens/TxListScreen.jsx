@@ -1,12 +1,12 @@
 import { useMemo, useState } from "react";
-import { ChevronLeft, Copy, Filter, Search, Trash2 } from "lucide-react";
+import { ChevronLeft, Copy, Filter, Search, Trash2, TrendingDown, TrendingUp } from "lucide-react";
 import PeriodPicker from "../components/period/PeriodPicker";
 import Badge from "../components/ui/Badge";
 import Pill from "../components/ui/Pill";
 import DeletePeriodSheet from "../features/transactions/DeletePeriodSheet";
 import { STATUS } from "../constants/app";
 import { C } from "../constants/theme";
-import { fmtS } from "../utils/format";
+import { fmt, fmtS } from "../utils/format";
 import { getGroupLabel } from "../utils/groups";
 import { formatPeriodLabel, formatShortDate } from "../utils/period";
 
@@ -43,6 +43,14 @@ const TxListScreen = ({txs, allTxs, goals = [], categoryGroups = [], period, set
     if(q&&!(tx.desc||"").toLowerCase().includes(q.toLowerCase())) return false;
     return true;
   }).sort((a,b)=>(b.date||"").localeCompare(a.date||"")),[txs,fS,fG,fGoal,q]);
+
+  // Total mengikuti daftar yang sedang difilter (semua status yang tampil, bukan hanya selesai).
+  const totals = useMemo(()=>filtered.reduce((acc, tx)=>{
+    const amt = Number(tx.amt) || 0;
+    if(tx.type==="income") acc.income += amt;
+    else acc.expense += amt;
+    return acc;
+  }, {income:0, expense:0}), [filtered]);
 
   return (
     <div style={{flex:1, overflowY:"auto", paddingBottom:92, background:C.bg}}>
@@ -105,7 +113,25 @@ const TxListScreen = ({txs, allTxs, goals = [], categoryGroups = [], period, set
       )}
 
       <div style={{padding:"12px 14px"}}>
-        {filtered.length===0 && <p style={{textAlign:"center", color:C.textL, fontSize:13, padding:"3rem 0"}}>Tidak ada transaksi</p>}
+        {/* Total mengikuti filter aktif (semua status yang tampil) */}
+        <div style={{display:"flex", gap:8, marginBottom:12}}>
+          <div style={{flex:1, background:"#fff", border:`1px solid ${C.borderL}`, borderRadius:12, padding:"10px 12px", boxShadow:"0 1px 4px rgba(0,0,0,0.03)"}}>
+            <div style={{display:"flex", alignItems:"center", gap:5, marginBottom:3}}>
+              <TrendingUp size={12} color={C.pri}/>
+              <span style={{fontSize:10, fontWeight:700, color:C.textM, letterSpacing:0.3}}>PEMASUKAN</span>
+            </div>
+            <p style={{fontSize:15, fontWeight:800, color:C.pri, margin:0, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>{fmt(totals.income)}</p>
+          </div>
+          <div style={{flex:1, background:"#fff", border:`1px solid ${C.borderL}`, borderRadius:12, padding:"10px 12px", boxShadow:"0 1px 4px rgba(0,0,0,0.03)"}}>
+            <div style={{display:"flex", alignItems:"center", gap:5, marginBottom:3}}>
+              <TrendingDown size={12} color={C.red}/>
+              <span style={{fontSize:10, fontWeight:700, color:C.textM, letterSpacing:0.3}}>PENGELUARAN</span>
+            </div>
+            <p style={{fontSize:15, fontWeight:800, color:C.red, margin:0, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>{fmt(totals.expense)}</p>
+          </div>
+        </div>
+        <p style={{fontSize:11, color:C.textM, margin:"0 0 10px", textAlign:"center"}}>{filtered.length} transaksi · sesuai filter</p>
+        {filtered.length===0 && <p style={{textAlign:"center", color:C.textL, fontSize:13, padding:"2rem 0"}}>Tidak ada transaksi</p>}
         {filtered.length > 0 && (
           <div style={{background:"#fff", border:`1px solid ${C.borderL}`, borderRadius:12, overflow:"hidden"}}>
             {filtered.map((tx,i)=>{
