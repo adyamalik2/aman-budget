@@ -130,6 +130,10 @@ const TxListScreen = ({txs, allTxs, goals = [], categoryGroups = [], period, set
             <p style={{fontSize:15, fontWeight:800, color:C.red, margin:0, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>{fmt(totals.expense)}</p>
           </div>
         </div>
+        <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", background:`linear-gradient(135deg, ${C.priBg}, #fff)`, border:`1px solid ${C.borderL}`, borderRadius:12, padding:"10px 14px", marginBottom:8, boxShadow:"0 1px 4px rgba(0,0,0,0.03)"}}>
+          <span style={{fontSize:11, fontWeight:700, color:C.textM, letterSpacing:0.3}}>SISA AMAN</span>
+          <span style={{fontSize:16, fontWeight:800, color:(totals.income-totals.expense)<0?C.red:C.priD}}>{fmt(totals.income - totals.expense)}</span>
+        </div>
         <p style={{fontSize:11, color:C.textM, margin:"0 0 10px", textAlign:"center"}}>{filtered.length} transaksi · sesuai filter</p>
         {filtered.length===0 && <p style={{textAlign:"center", color:C.textL, fontSize:13, padding:"2rem 0"}}>Tidak ada transaksi</p>}
         {filtered.length > 0 && (
