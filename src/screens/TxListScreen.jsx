@@ -40,9 +40,9 @@ const TxListScreen = ({txs, allTxs, goals = [], categoryGroups = [], period, set
     if(fG!=="all"&&tx.grp!==fG) return false;
     if(fGoal==="none"&&tx.goalId) return false;
     if(fGoal!=="all"&&fGoal!=="none"&&tx.goalId!==fGoal) return false;
-    if(q&&!tx.desc.toLowerCase().includes(q.toLowerCase())) return false;
+    if(q&&!(tx.desc||"").toLowerCase().includes(q.toLowerCase())) return false;
     return true;
-  }).sort((a,b)=>b.date.localeCompare(a.date)),[txs,fS,fG,fGoal,q]);
+  }).sort((a,b)=>(b.date||"").localeCompare(a.date||"")),[txs,fS,fG,fGoal,q]);
 
   return (
     <div style={{flex:1, overflowY:"auto", paddingBottom:92, background:C.bg}}>

@@ -119,7 +119,7 @@ const HomeScreen = ({txs, allTxs = [], goals = [], period, setPeriod, years, onC
     : null;
   const unpaidItems = txs.filter(x=>x.status==="belum_selesai").slice(0, 3);
   const unpaidCount = txs.filter(x=>x.status==="belum_selesai").length;
-  const recent = [...txs].sort((a,b)=>b.date.localeCompare(a.date)).slice(0, 4);
+  const recent = [...txs].sort((a,b)=>(b.date||"").localeCompare(a.date||"")).slice(0, 4);
   const periodMode = normalizePeriod(period).mode;
   const periodLabel = formatPeriodLabel(period);
   const handleBellClick = () => {

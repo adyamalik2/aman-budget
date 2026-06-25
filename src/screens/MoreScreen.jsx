@@ -218,7 +218,7 @@ const MoreScreen = ({
             {icon:CreditCard, label:"Kelola Rekening", action:()=>setSubPage("accounts")},
             {icon:LayoutGrid, label:"Kategori & Grup", action:()=>setSubPage("category-groups")},
             {icon:Trash2, label:"Tong Sampah", action:()=>setTrashOpen(true)},
-            {icon:Shield, label:"Keamanan & Privasi", action:()=>alert("Keamanan & Privasi\n\nData AMAN Budget disimpan di perangkat Anda. Backup ke cloud hanya berjalan saat Anda login Google dan menekan tombol Backup. Data tidak dibagikan ke pihak ketiga.\n\nKunci PIN/biometrik sedang disiapkan untuk versi berikutnya.")},
+            {icon:Shield, label:"Keamanan & Privasi", action:()=>setSubPage("security")},
             {icon:Star, label:"Beri Rating", action:()=>alert("Terima kasih! 🙏\n\nFitur beri rating akan aktif setelah AMAN Budget rilis resmi di Google Play.")},
           ].map((it, i) => (
             <button key={i} onClick={it.action} style={{width:"100%", padding:"12px 16px", background:"none", border:"none", borderTop: i>0?`1px solid ${C.borderL}`:"none", cursor:"pointer", display:"flex", alignItems:"center", gap:12, textAlign:"left"}}>

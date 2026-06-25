@@ -1,23 +1,26 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, lazy, Suspense } from "react";
 import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 import { GoogleSignIn } from "@capawesome/capacitor-google-sign-in";
 import { GoogleAuthProvider, onAuthStateChanged, signInWithCredential, signInWithPopup, signOut } from "firebase/auth";
 import BottomNav from "./components/layout/BottomNav";
 import HomeScreen from "./screens/HomeScreen";
-import GoalsScreen from "./screens/GoalsScreen";
-import TransferScreen from "./screens/TransferScreen";
-import ZakatScreen from "./screens/ZakatScreen";
-import UpgradeScreen from "./screens/UpgradeScreen";
-import MoreScreen from "./screens/MoreScreen";
-import AccountsScreen from "./screens/AccountsScreen";
-import CategoryGroupsScreen from "./screens/CategoryGroupsScreen";
-import GroupRecapScreen from "./screens/GroupRecapScreen";
-import ReportsScreen from "./screens/ReportsScreen";
-import TxListScreen from "./screens/TxListScreen";
-import ShareScreen from "./screens/ShareScreen";
 import WelcomeScreen from "./screens/WelcomeScreen";
+import LockScreen from "./screens/LockScreen";
 import AddSheet from "./features/transactions/AddSheet";
+// Layar sekunder di-lazy load agar bundle awal lebih ringan (recharts, html-to-image, dll).
+const GoalsScreen = lazy(() => import("./screens/GoalsScreen"));
+const TransferScreen = lazy(() => import("./screens/TransferScreen"));
+const ZakatScreen = lazy(() => import("./screens/ZakatScreen"));
+const UpgradeScreen = lazy(() => import("./screens/UpgradeScreen"));
+const MoreScreen = lazy(() => import("./screens/MoreScreen"));
+const AccountsScreen = lazy(() => import("./screens/AccountsScreen"));
+const CategoryGroupsScreen = lazy(() => import("./screens/CategoryGroupsScreen"));
+const GroupRecapScreen = lazy(() => import("./screens/GroupRecapScreen"));
+const ReportsScreen = lazy(() => import("./screens/ReportsScreen"));
+const TxListScreen = lazy(() => import("./screens/TxListScreen"));
+const ShareScreen = lazy(() => import("./screens/ShareScreen"));
+const SecurityScreen = lazy(() => import("./screens/SecurityScreen"));
 import { C } from "./constants/theme";
 import { DEFAULT_ACCOUNTS, DEFAULT_CATEGORY_GROUPS, DEFAULT_QUICK_MENU, DEFAULT_QUICK_SHORTCUTS, STORAGE_KEYS } from "./constants/app";
 import { INIT_GOALS, INIT_TX } from "./data/initialData";
@@ -25,6 +28,7 @@ import { auth, googleProvider, isFirebaseConfigured } from "./lib/firebase";
 import { backupToCloud, restoreFromCloud } from "./lib/cloudBackup";
 import { loadStored, removeStored, saveStored } from "./utils/storage";
 import { formatBackupDate, isJsonFile, isValidBackupData } from "./utils/backup";
+import { DEFAULT_LOCK, hashPin, isValidLock, makeSalt } from "./utils/lock";
 import {
   copyBudgetFromPreviousMonth,
   deleteTransactionsByPeriod,
@@ -41,6 +45,13 @@ const GOAL_ICONS  = ["plane","grad","shield"];
 const GOOGLE_WEB_CLIENT_ID = "755957066136-nk0gmi6pf6mqo22r7iu2tr2p6nu6rf4c.apps.googleusercontent.com";
 const SKIP_LOGIN_KEY = "aman_budget_skip_login";
 const LOCAL_MODE_USER = {name:"Malik", email:"mode-lokal@amanbudget.local"};
+
+// Fallback saat layar lazy sedang dimuat.
+const ScreenFallback = () => (
+  <div style={{flex:1, minHeight:"70vh", display:"flex", alignItems:"center", justifyContent:"center"}}>
+    <div style={{width:34, height:34, border:`3px solid ${C.priL}`, borderTopColor:C.pri, borderRadius:"50%", animation:"spin 0.8s linear infinite"}}/>
+  </div>
+);
 
 // ─── APP ───
 export default function App() {
@@ -61,6 +72,8 @@ export default function App() {
   const [backupMeta, setBackupMeta] = useState(() => loadStored(STORAGE_KEYS.backupMeta, {}, v=>v&&typeof v==="object"&&!Array.isArray(v)));
   const [period, setPeriod] = useState(() => normalizePeriod(loadStored(STORAGE_KEYS.period, getDefaultPeriod(), v=>v&&typeof v==="object"&&!Array.isArray(v))));
   const [isPro, setIsPro] = useState(() => loadStored(STORAGE_KEYS.isPro, false, v=>v===true||v===false));
+  const [lockConfig, setLockConfig] = useState(() => loadStored(STORAGE_KEYS.appLock, DEFAULT_LOCK, isValidLock));
+  const [locked, setLocked] = useState(() => loadStored(STORAGE_KEYS.appLock, DEFAULT_LOCK, isValidLock).enabled === true);
   const [cloudUser, setCloudUser] = useState(null);
   const [cloudBusy, setCloudBusy] = useState(false);
   const [hasUnsyncedChanges, setHasUnsyncedChanges] = useState(false);
@@ -78,6 +91,7 @@ export default function App() {
   useEffect(()=>{ saveStored(STORAGE_KEYS.backupMeta, backupMeta); }, [backupMeta]);
   useEffect(()=>{ saveStored(STORAGE_KEYS.period, normalizePeriod(period)); }, [period]);
   useEffect(()=>{ saveStored(STORAGE_KEYS.isPro, isPro); }, [isPro]);
+  useEffect(()=>{ saveStored(STORAGE_KEYS.appLock, lockConfig); }, [lockConfig]);
   useEffect(()=>{ saveStored(SKIP_LOGIN_KEY, hasSkippedLogin); }, [hasSkippedLogin]);
   useEffect(()=>{
     if(user) saveStored(STORAGE_KEYS.user, user);
@@ -509,6 +523,16 @@ export default function App() {
   };
   const onActivatePro   = () => { setIsPro(true);  alert("Mode Pro sementara aktif untuk testing."); };
   const onDeactivatePro = () => setIsPro(false);
+  const onSetPin = pin => {
+    const value = String(pin || "");
+    if(value.length < 4) return;
+    const salt = makeSalt();
+    setLockConfig({enabled:true, salt, pinHash:hashPin(value, salt), len:value.length});
+  };
+  const onDisableLock = () => {
+    setLockConfig({...DEFAULT_LOCK});
+    setLocked(false);
+  };
 
   useEffect(() => {
     if (Capacitor.getPlatform() !== "android") return undefined;
@@ -543,8 +567,26 @@ export default function App() {
     };
   }, [addOpen, subPage, tab]);
 
+  // Kunci ulang app saat kembali dari background (jika kunci PIN aktif).
+  useEffect(() => {
+    if(Capacitor.getPlatform() === "web") return undefined;
+    let removeListener;
+    const setup = async () => {
+      const listener = await CapacitorApp.addListener("appStateChange", ({isActive}) => {
+        if(!isActive && lockConfig.enabled) setLocked(true);
+      });
+      removeListener = () => listener.remove();
+    };
+    setup();
+    return () => { removeListener?.(); };
+  }, [lockConfig.enabled]);
+
   if(!user && !hasSkippedLogin) {
     return <WelcomeScreen onGoogleLogin={onCloudLogin} onContinueLocal={onContinueLocal} busy={cloudBusy}/>;
+  }
+
+  if(locked && lockConfig.enabled) {
+    return <LockScreen config={lockConfig} onUnlock={()=>setLocked(false)}/>;
   }
 
   const renderScreen = () => {
@@ -553,6 +595,7 @@ export default function App() {
     if(subPage==="zakat") return <ZakatScreen setSubPage={setSubPage} onAddZakatBudget={onAddZakatBudget}/>;
     if(subPage==="accounts") return <AccountsScreen accounts={accounts} txs={txs} onAccountsChange={onAccountsChange} setSubPage={setSubPage}/>;
     if(subPage==="category-groups") return <CategoryGroupsScreen categoryGroups={categoryGroups} txs={txs} onCategoryGroupsChange={onCategoryGroupsChange} setSubPage={setSubPage}/>;
+    if(subPage==="security") return <SecurityScreen lockConfig={lockConfig} onSetPin={onSetPin} onDisableLock={onDisableLock} setSubPage={setSubPage}/>;
     if(subPage==="group-recap") return <GroupRecapScreen txs={periodTxs} period={period} setPeriod={updatePeriod} years={periodYears} categoryGroups={categoryGroups} setSubPage={setSubPage}/>;
     if(subPage==="tx-list") return <TxListScreen txs={periodTxs} allTxs={activeTxs} goals={goals} categoryGroups={categoryGroups} period={period} setPeriod={updatePeriod} years={periodYears} onCopyBudget={onCopyBudget} onDeletePeriod={onDeletePeriod} setSubPage={setSubPage} setEditTx={setEditTx} setAddOpen={(open)=>{if(open) setAddPreset(null); setAddOpen(open);}} onDelete={onDelete} onDone={onDone} onCopy={onCopyTx}/>;
     if(subPage==="share") return <ShareScreen txs={periodTxs} allTxs={activeTxs} goals={goals} period={period} categoryGroups={categoryGroups} setSubPage={setSubPage}/>;
@@ -569,13 +612,16 @@ export default function App() {
     <div style={{minHeight:"100vh", background:C.bg, display:"flex", justifyContent:"center", fontFamily:"-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"}}>
       <style>{`
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        @keyframes spin { to { transform: rotate(360deg); } }
         * { -webkit-tap-highlight-color: transparent; }
         input, select, textarea { font-family: inherit; }
         button { font-family: inherit; }
         ::-webkit-scrollbar { width: 0; }
       `}</style>
       <div style={{width:"100%", maxWidth:430, display:"flex", flexDirection:"column", minHeight:"100vh", position:"relative", background:C.bg}}>
-        {renderScreen()}
+        <Suspense fallback={<ScreenFallback/>}>
+          {renderScreen()}
+        </Suspense>
         {!hideNav && <BottomNav tab={tab} setTab={(t)=>{setTab(t); setSubPage(null);}} setAddOpen={(open)=>{if(open) setAddPreset(null); setAddOpen(open);}} setEditTx={setEditTx}/>}
         {addOpen && <AddSheet editTx={editTx} initialData={addPreset} goals={goals} accounts={accounts} categoryGroups={categoryGroups} lastTxDate={lastTxDate} onSave={onSave} onClose={()=>{setAddOpen(false); setEditTx(null); setAddPreset(null);}}/>}
       </div>

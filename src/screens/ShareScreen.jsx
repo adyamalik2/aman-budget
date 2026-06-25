@@ -180,7 +180,7 @@ const ShareScreen = ({allTxs = [], goals = [], period = null, categoryGroups = [
   };
 
   const incomeTxs = useMemo(() =>
-    reportTxs.filter(tx => tx.type === "income").sort((a, b) => b.date.localeCompare(a.date)),
+    reportTxs.filter(tx => tx.type === "income").sort((a, b) => (b.date||"").localeCompare(a.date||"")),
   [reportTxs]);
 
   const groupedExpenses = useMemo(() => {
@@ -189,7 +189,7 @@ const ShareScreen = ({allTxs = [], goals = [], period = null, categoryGroups = [
       const key = resolveTxGrp(tx);
       (map[key] = map[key] || []).push(tx);
     });
-    Object.keys(map).forEach(k => map[k].sort((a, b) => b.date.localeCompare(a.date)));
+    Object.keys(map).forEach(k => map[k].sort((a, b) => (b.date||"").localeCompare(a.date||"")));
     return map;
   }, [reportTxs]);
 

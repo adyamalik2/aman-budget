@@ -94,4 +94,5 @@ export const STORAGE_KEYS = {
   quickShortcuts: "amanBudget.quickShortcuts",
   quickMenu: "amanBudget.quickMenu",
   backupMeta: "amanBudget.backupMeta",
+  appLock: "amanBudget.appLock",
 };
