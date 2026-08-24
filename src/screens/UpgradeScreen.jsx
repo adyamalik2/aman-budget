@@ -137,29 +137,37 @@ const UpgradeScreen = ({setSubPage, isPro = false, onActivatePro, onDeactivatePr
           Pembayaran dikelola Google Play · Bisa dibatalkan kapan saja
         </p>
 
-        {/* Dev/Admin unlock — hapus saat rilis resmi Google Play */}
-        <div style={{borderTop:`1px solid ${C.borderL}`, paddingTop:14, display:"flex", flexDirection:"column", gap:8}}>
-          <p style={{fontSize:10, fontWeight:700, color:C.textL, margin:0, textAlign:"center", letterSpacing:0.5}}>
-            MODE DEVELOPMENT
-          </p>
-          {isPro ? (
-            <>
-              <div style={{background:C.priL, borderRadius:10, padding:"8px 12px", display:"flex", alignItems:"center", justifyContent:"center", gap:6}}>
-                <Crown size={14} color={C.priD}/>
-                <span style={{fontSize:12, fontWeight:800, color:C.priD}}>Pro aktif (Dev Mode)</span>
-              </div>
-              <button onClick={onDeactivatePro}
-                style={{background:C.borderL, border:`1px solid ${C.border}`, borderRadius:12, padding:"12px", color:C.textM, fontSize:13, fontWeight:700, cursor:"pointer"}}>
-                Matikan Pro Sementara
+        {/* Akses pemilik. HANYA ikut ter-bundle pada `npm run build:android:owner`
+            -- `__OWNER_BUILD__` bernilai literal false pada build web publik dan
+            APK pelanggan, sehingga Rollup membuang seluruh blok ini.
+            JANGAN membagikan hasil owner build kepada pelanggan. */}
+        {__OWNER_BUILD__ && (
+          <div style={{borderTop:`1px solid ${C.borderL}`, paddingTop:14, display:"flex", flexDirection:"column", gap:8}}>
+            <p style={{fontSize:10, fontWeight:700, color:C.textL, margin:0, textAlign:"center", letterSpacing:0.5}}>
+              AKSES PRIBADI PEMILIK
+            </p>
+            <p style={{fontSize:9, color:C.textL, margin:0, textAlign:"center", lineHeight:1.5}}>
+              Build khusus pemilik — jangan dibagikan ke pelanggan.
+            </p>
+            {isPro ? (
+              <>
+                <div style={{background:C.priL, borderRadius:10, padding:"8px 12px", display:"flex", alignItems:"center", justifyContent:"center", gap:6}}>
+                  <Crown size={14} color={C.priD}/>
+                  <span style={{fontSize:12, fontWeight:800, color:C.priD}}>Pro pemilik aktif</span>
+                </div>
+                <button onClick={onDeactivatePro}
+                  style={{background:C.borderL, border:`1px solid ${C.border}`, borderRadius:12, padding:"12px", color:C.textM, fontSize:13, fontWeight:700, cursor:"pointer"}}>
+                  Matikan Pro Pemilik
+                </button>
+              </>
+            ) : (
+              <button onClick={onActivatePro}
+                style={{background:C.goldL, border:`1px solid ${C.gold}66`, borderRadius:12, padding:"12px", color:C.goldD, fontSize:13, fontWeight:700, cursor:"pointer"}}>
+                Pulihkan Akses Pro Pemilik
               </button>
-            </>
-          ) : (
-            <button onClick={onActivatePro}
-              style={{background:C.goldL, border:`1px solid ${C.gold}66`, borderRadius:12, padding:"12px", color:C.goldD, fontSize:13, fontWeight:700, cursor:"pointer"}}>
-              Aktifkan Pro Sementara
-            </button>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

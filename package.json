@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build --mode web",
+    "build:web": "vite build --mode web",
+    "build:android:owner": "vite build --mode android-owner",
+    "build:android:customer": "vite build --mode android-customer",
     "lint": "eslint .",
     "preview": "vite preview"
   },

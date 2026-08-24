@@ -14,7 +14,9 @@ export default defineConfig([
       reactRefresh.configs.vite,
     ],
     languageOptions: {
-      globals: globals.browser,
+      // __OWNER_BUILD__ di-inject vite.config.js lewat `define` (lihat di sana):
+      // literal boolean pemisah build owner/web/customer, bukan variabel runtime.
+      globals: { ...globals.browser, __OWNER_BUILD__: 'readonly' },
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
   },

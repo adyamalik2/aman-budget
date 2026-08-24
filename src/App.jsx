@@ -71,7 +71,14 @@ export default function App() {
   const [quickMenu, setQuickMenu] = useState(() => loadStored(STORAGE_KEYS.quickMenu, DEFAULT_QUICK_MENU, Array.isArray));
   const [backupMeta, setBackupMeta] = useState(() => loadStored(STORAGE_KEYS.backupMeta, {}, v=>v&&typeof v==="object"&&!Array.isArray(v)));
   const [period, setPeriod] = useState(() => normalizePeriod(loadStored(STORAGE_KEYS.period, getDefaultPeriod(), v=>v&&typeof v==="object"&&!Array.isArray(v))));
-  const [isPro, setIsPro] = useState(() => loadStored(STORAGE_KEYS.isPro, false, v=>v===true||v===false));
+  // Pro HANYA dibaca dari localStorage pada build owner (APK pribadi Malik).
+  // Di web publik & APK pelanggan nilainya dipaksa false, sehingga menyetel
+  // `aman_budget_is_pro=true` lewat console lalu reload TIDAK membuka Pro.
+  // `__OWNER_BUILD__` adalah literal boolean dari vite.config.js, jadi cabang
+  // ini benar-benar dibuang Rollup pada build non-owner.
+  const [isPro, setIsPro] = useState(() => (
+    __OWNER_BUILD__ ? loadStored(STORAGE_KEYS.isPro, false, v=>v===true||v===false) : false
+  ));
   const [lockConfig, setLockConfig] = useState(() => loadStored(STORAGE_KEYS.appLock, DEFAULT_LOCK, isValidLock));
   const [locked, setLocked] = useState(() => loadStored(STORAGE_KEYS.appLock, DEFAULT_LOCK, isValidLock).enabled === true);
   const [cloudUser, setCloudUser] = useState(null);
@@ -90,7 +97,9 @@ export default function App() {
   useEffect(()=>{ saveStored(STORAGE_KEYS.quickMenu, quickMenu); }, [quickMenu]);
   useEffect(()=>{ saveStored(STORAGE_KEYS.backupMeta, backupMeta); }, [backupMeta]);
   useEffect(()=>{ saveStored(STORAGE_KEYS.period, normalizePeriod(period)); }, [period]);
-  useEffect(()=>{ saveStored(STORAGE_KEYS.isPro, isPro); }, [isPro]);
+  // Sengaja hanya menulis pada build owner: kalau build non-owner ikut menulis,
+  // nilai `false` akan MENIMPA status Pro milik Malik yang sudah tersimpan.
+  useEffect(()=>{ if(__OWNER_BUILD__) saveStored(STORAGE_KEYS.isPro, isPro); }, [isPro]);
   useEffect(()=>{ saveStored(STORAGE_KEYS.appLock, lockConfig); }, [lockConfig]);
   useEffect(()=>{ saveStored(SKIP_LOGIN_KEY, hasSkippedLogin); }, [hasSkippedLogin]);
   useEffect(()=>{
@@ -521,8 +530,12 @@ export default function App() {
     setHasSkippedLogin(false);
     setUser(null);
   };
-  const onActivatePro   = () => { setIsPro(true);  alert("Mode Pro sementara aktif untuk testing."); };
-  const onDeactivatePro = () => setIsPro(false);
+  // Jalur pulihkan/matikan Pro milik pemilik. Pada build non-owner keduanya
+  // undefined, dan UI pemanggilnya juga tidak ikut ter-bundle.
+  const onActivatePro   = __OWNER_BUILD__
+    ? () => { setIsPro(true); alert("Akses Pro pemilik diaktifkan di perangkat ini."); }
+    : undefined;
+  const onDeactivatePro = __OWNER_BUILD__ ? () => setIsPro(false) : undefined;
   const onSetPin = pin => {
     const value = String(pin || "");
     if(value.length < 4) return;
